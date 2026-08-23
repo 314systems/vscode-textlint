@@ -7,7 +7,10 @@ async function main() {
   try {
     const extensionDevelopmentPath = process.cwd();
     const extensionTestsPath = path.resolve(extensionDevelopmentPath, "tests/suite/index.ts");
-    const workspaceFolder = path.resolve(extensionDevelopmentPath, "tests/fixtures/single-root-workspace");
+    const workspaceFolder = path.resolve(
+      extensionDevelopmentPath,
+      "tests/fixtures/single-root-workspace",
+    );
 
     try {
       execSync("npm ci", {
@@ -32,4 +35,4 @@ async function main() {
   }
 }
 
-main();
+await main();
