@@ -14,33 +14,24 @@ jobs:
     # Disabled due to instability issues
     if: false
     name: Windows
-    runs-on: windows-2022
+    runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .tool-versions
-      - name: Get npm cache directory
-        id: npm-cache
-        run: |
-          echo "::set-output name=dir::$(npm config get cache)"
-      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ${{ steps.npm-cache.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          cache: npm
       - run: npm ci
       - run: npm run test:e2e
   linux:
     name: Linux
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       DISPLAY: ":99"
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v7.0.1
       - run: |
           sudo apt-get update
           sudo apt-get install -y libxkbfile-dev pkg-config libsecret-1-dev libxss1 dbus dbus-x11 xvfb libgtk-3-0 libgbm1 libasound2t64 libcairo2
@@ -49,15 +40,10 @@ jobs:
           cat /tmp/dbus.env
           # Xvfb settings
           sudo Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset > /dev/null 2>&1 &
-      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .tool-versions
-      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          cache: npm
       - run: npm ci
       - name: Run E2E tests
         run: |
@@ -67,25 +53,20 @@ jobs:
     # Disabled due to instability issues
     if: false
     name: macOS
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 30
     env:
       DISPLAY: ":99"
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v7.0.1
       - run: |
           brew install --cask xquartz
       - run: |
           /usr/X11/bin/Xvfb :99 -screen 0 1024x768x24 &
           sleep 5
-      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .tool-versions
-      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          cache: npm
       - run: npm ci
       - run: npm run test:e2e
