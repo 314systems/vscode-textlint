@@ -2,8 +2,8 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { commands, extensions, Uri, workspace } from "vscode";
 import type { Disposable, Extension } from "vscode";
-import { NotificationType } from "vscode-jsonrpc";
-import type { Diagnostic as LspDiagnostic } from "vscode-languageserver-types";
+import { PublishDiagnosticsNotification } from "vscode-languageclient/node";
+import type { Diagnostic } from "vscode-languageclient/node";
 import { test } from "node:test";
 import type { TestContext } from "node:test";
 import type { ExtensionInternal } from "../../src/client/extension.ts";
@@ -12,11 +12,7 @@ const testPromises: Promise<void>[] = [];
 const TEST_TIMEOUT = 90_000;
 const DIAGNOSTICS_TIMEOUT = 10_000;
 
-export const PublishDiagnosticsNotification = {
-  type: new NotificationType<{ uri: string; diagnostics: LspDiagnostic[] }>(
-    "textDocument/publishDiagnostics",
-  ),
-};
+export { PublishDiagnosticsNotification };
 
 let extension: Extension<ExtensionInternal>;
 let internals: ExtensionInternal;
@@ -86,9 +82,8 @@ export function getWorkspaceRoot(): string {
 
 export function waitForDiagnostics(
   uri: Uri,
-  accept: (diagnostics: readonly LspDiagnostic[]) => boolean = (diagnostics) =>
-    diagnostics.length > 0,
-): Promise<LspDiagnostic[]> {
+  accept: (diagnostics: readonly Diagnostic[]) => boolean = (diagnostics) => diagnostics.length > 0,
+): Promise<Diagnostic[]> {
   return new Promise((resolve, reject) => {
     const disposable = internals.client.onNotification(
       PublishDiagnosticsNotification.type,

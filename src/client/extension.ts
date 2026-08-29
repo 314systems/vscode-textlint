@@ -1,21 +1,15 @@
 import { workspace, window, commands } from "vscode";
 import type { ExtensionContext, QuickPickItem, WorkspaceFolder } from "vscode";
 
-import {
-  State as ServerState,
-  ErrorHandler,
-  CloseAction,
-  RevealOutputChannelOn,
-} from "vscode-languageclient";
+import { State, ErrorHandler, CloseAction, RevealOutputChannelOn } from "vscode-languageclient";
 
 import {
   LanguageClient,
   LanguageClientOptions,
+  LogTraceNotification,
   ServerOptions,
   TransportKind,
 } from "vscode-languageclient/node";
-
-import { LogTraceNotification } from "vscode-jsonrpc";
 
 import { Utils as URIUtils } from "vscode-uri";
 
@@ -45,7 +39,7 @@ export async function activate(context: ExtensionContext): Promise<ExtensionInte
   const client = newClient(context);
   const statusBar = new StatusBar(readConfig().languages);
   client.onDidChangeState((event) => {
-    statusBar.setServerRunning(event.newState === ServerState.Running);
+    statusBar.setServerRunning(event.newState === State.Running);
   });
   client.onNotification(StatusNotification.type, (params) => {
     statusBar.setStatus(to(params.status));

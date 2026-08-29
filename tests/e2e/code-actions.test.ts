@@ -9,8 +9,10 @@ import {
   WorkspaceEdit,
 } from "vscode";
 import type { CodeAction } from "vscode";
-import type { Diagnostic as LspDiagnostic } from "vscode-languageserver-types";
-import type { CodeAction as LspCodeAction } from "vscode-languageclient/node";
+import type {
+  CodeAction as LspCodeAction,
+  Diagnostic as LspDiagnostic,
+} from "vscode-languageclient/node";
 import {
   checkedTest,
   extensionInternals,

@@ -1,4 +1,4 @@
-import { NotificationType } from "vscode-jsonrpc";
+import { NotificationType } from "vscode-languageserver";
 
 export type RunMode = "onSave" | "onType";
 export type TraceMode = "off" | "messages" | "verbose";
