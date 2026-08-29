@@ -5,26 +5,22 @@ import { findMatchingFixes, separatedFixes, type AutoFix, type FixRepository } f
 
 export const sourceFixAllTextlint = `${CodeActionKind.SourceFixAll}.textlint`;
 
-export interface RequestedCodeActionKinds {
-  readonly quickFix: boolean;
-  readonly sourceFixAll: boolean;
+export const textlintCodeActionKinds = [CodeActionKind.QuickFix, sourceFixAllTextlint] as const;
+
+function matchesRequestedKind(kind: string, requested: string): boolean {
+  return (
+    requested === CodeActionKind.Empty || kind === requested || kind.startsWith(`${requested}.`)
+  );
 }
 
-export function requestedCodeActionKinds(only?: readonly string[]): RequestedCodeActionKinds {
-  return {
-    quickFix:
-      only === undefined ||
-      only.some((kind) => kind === CodeActionKind.Empty || kind === CodeActionKind.QuickFix),
-    sourceFixAll:
-      only?.some((kind) =>
-        [
-          CodeActionKind.Empty,
-          CodeActionKind.Source,
-          CodeActionKind.SourceFixAll,
-          sourceFixAllTextlint,
-        ].includes(kind),
-      ) ?? false,
-  };
+export function requestedCodeActionKinds(only?: readonly string[]): ReadonlySet<string> {
+  // Without an explicit filter the client only wants the lightbulb, not source actions.
+  const requested = only ?? [CodeActionKind.QuickFix];
+  return new Set(
+    textlintCodeActionKinds.filter((kind) =>
+      requested.some((entry) => matchesRequestedKind(kind, entry)),
+    ),
+  );
 }
 
 function toTextEdit(textDocument: TextDocument, autoFix: AutoFix): TextEdit {
@@ -48,13 +44,34 @@ function toWorkspaceEdit(textDocument: TextDocument, repository: FixRepository, 
   };
 }
 
+function sameRuleFixAction(
+  textDocument: TextDocument,
+  repository: FixRepository,
+  ruleId: string,
+): CodeAction[] {
+  const fixes = separatedFixes(repository, (fix) => fix.ruleId === ruleId);
+  if (fixes.length <= 1) {
+    return [];
+  }
+  return [
+    {
+      title: `Fix all ${ruleId} problems`,
+      kind: CodeActionKind.QuickFix,
+      diagnostics: fixes.map((fix) => fix.diagnostic),
+      edit: toWorkspaceEdit(textDocument, repository, fixes),
+    },
+  ];
+}
+
 export function createCodeActions(
   textDocument: TextDocument,
   repository: FixRepository,
   diagnostics: readonly Diagnostic[],
-  kinds: RequestedCodeActionKinds,
+  kinds: ReadonlySet<string>,
 ): CodeAction[] {
-  const requestedFixes = kinds.quickFix ? findMatchingFixes(repository, diagnostics) : [];
+  const requestedFixes = kinds.has(CodeActionKind.QuickFix)
+    ? findMatchingFixes(repository, diagnostics)
+    : [];
   const quickFixes: CodeAction[] = requestedFixes.map((fix) => ({
     title: `Fix this ${fix.ruleId} problem`,
     kind: CodeActionKind.QuickFix,
@@ -62,21 +79,9 @@ export function createCodeActions(
     edit: toWorkspaceEdit(textDocument, repository, [fix]),
   }));
   const sameRuleFixes: CodeAction[] = [...new Set(requestedFixes.map((fix) => fix.ruleId))].flatMap(
-    (ruleId) => {
-      const fixes = separatedFixes(repository, (fix) => fix.ruleId === ruleId);
-      return fixes.length > 1
-        ? [
-            {
-              title: `Fix all ${ruleId} problems`,
-              kind: CodeActionKind.QuickFix,
-              diagnostics: fixes.map((fix) => fix.diagnostic),
-              edit: toWorkspaceEdit(textDocument, repository, fixes),
-            },
-          ]
-        : [];
-    },
+    (ruleId) => sameRuleFixAction(textDocument, repository, ruleId),
   );
-  const sourceFixes: CodeAction[] = kinds.sourceFixAll
+  const sourceFixes: CodeAction[] = kinds.has(sourceFixAllTextlint)
     ? [
         {
           title: "Fix all auto-fixable textlint problems",

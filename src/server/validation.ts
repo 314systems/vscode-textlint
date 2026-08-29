@@ -85,17 +85,19 @@ async function lintDocument(
   const { dependencies } = context;
   const uri = URI.parse(document.uri);
   const [folder, engine] = dependencies.lookupLinter(document);
+  if (!engine) {
+    publishValidation(context, document.uri, document.version, slot, []);
+    return;
+  }
+
   const supported =
-    engine?.availableExtensions.includes(URIUtils.extname(uri)) === true &&
+    engine.availableExtensions.includes(URIUtils.extname(uri)) &&
     isTarget(folder, uri, dependencies.settings().targetPath);
-  if (!engine || !supported) {
+  if (!supported || (await scanIgnored(engine, uri.fsPath, dependencies.trace))) {
     publishValidation(context, document.uri, document.version, slot, []);
     return;
   }
-  if (await scanIgnored(engine, uri.fsPath, dependencies.trace)) {
-    publishValidation(context, document.uri, document.version, slot, []);
-    return;
-  }
+
   const result = await engine.linter.lintText(document.getText(), uri.fsPath);
   dependencies.trace("result", result);
   publishValidation(
@@ -115,9 +117,7 @@ async function validateDocument(context: ValidationContext, document: TextDocume
     return;
   }
   const slot = repositories.get(document.uri);
-  if (!slot) {
-    return;
-  }
+  if (!slot) return;
   try {
     await lintDocument(context, document, slot);
   } catch (error) {

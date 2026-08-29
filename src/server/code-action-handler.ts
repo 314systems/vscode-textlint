@@ -1,6 +1,10 @@
 import type { CodeAction, CodeActionParams } from "vscode-languageserver/node";
 import type { TextDocument } from "vscode-languageserver-textdocument";
-import { createCodeActions, requestedCodeActionKinds } from "./code-actions.ts";
+import {
+  createCodeActions,
+  requestedCodeActionKinds,
+  sourceFixAllTextlint,
+} from "./code-actions.ts";
 import { hasFixes } from "./fixes.ts";
 import type { FixRepositorySlot } from "./validation.ts";
 
@@ -22,18 +26,20 @@ export function createCodeActionHandler(
   return {
     handle: async (params: CodeActionParams): Promise<CodeAction[]> => {
       dependencies.trace("onCodeAction", params);
-      const uri = params.textDocument.uri;
-      const document = dependencies.document(uri);
-      const initialSlot = dependencies.repository(uri);
-      if (!initialSlot || !document) {
-        return [];
-      }
+
       const kinds = requestedCodeActionKinds(params.context.only);
-      if (!kinds.quickFix && !kinds.sourceFixAll) {
-        return [];
-      }
-      const version = document.version;
-      if (kinds.sourceFixAll || initialSlot.repository.version !== version) {
+      if (kinds.size === 0) return [];
+
+      const { uri } = params.textDocument;
+
+      const initialSlot = dependencies.repository(uri);
+      if (!initialSlot) return [];
+
+      const document = dependencies.document(uri);
+      if (!document) return [];
+      const { version } = document;
+
+      if (kinds.has(sourceFixAllTextlint) || initialSlot.repository.version !== version) {
         try {
           await dependencies.validate(document);
         } catch (error) {
@@ -41,15 +47,19 @@ export function createCodeActionHandler(
           return [];
         }
       }
+
       const slot = dependencies.repository(uri);
+      if (slot !== initialSlot) return [];
+      const { repository } = slot;
+
       if (
         dependencies.document(uri)?.version !== version ||
-        slot !== initialSlot ||
-        slot.repository.version !== version ||
-        !hasFixes(slot.repository)
+        repository.version !== version ||
+        !hasFixes(repository)
       ) {
         return [];
       }
+
       return createCodeActions(document, slot.repository, params.context.diagnostics, kinds);
     },
   };

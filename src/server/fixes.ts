@@ -66,15 +66,13 @@ export function separatedFixes(
       (left, right) =>
         right.fix.range[1] - left.fix.range[1] || right.fix.range[0] - left.fix.range[0],
     );
-  const result = candidates.slice(0, 1);
-  for (const fix of candidates.slice(1)) {
+  const result: AutoFix[] = [];
+  for (const fix of candidates) {
     const last = result.at(-1);
-    if (!last) {
-      break;
+    if (last && fix.fix.range[1] > last.fix.range[0]) {
+      continue;
     }
-    if (fix.fix.range[1] <= last.fix.range[0]) {
-      result.push(fix);
-    }
+    result.push(fix);
   }
   return result.toReversed();
 }

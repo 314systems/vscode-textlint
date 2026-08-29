@@ -10,23 +10,20 @@ import {
 import { replaceFixRepository } from "./fixes.ts";
 import { diagnostic, textlintMessage } from "./test-fixtures.ts";
 
+const kinds = (only?: readonly string[]) => [...requestedCodeActionKinds(only)];
+
 void test("code action core interprets LSP only filters", () => {
-  assert.deepStrictEqual(requestedCodeActionKinds(), {
-    quickFix: true,
-    sourceFixAll: false,
-  });
-  assert.deepStrictEqual(requestedCodeActionKinds([CodeActionKind.QuickFix]), {
-    quickFix: true,
-    sourceFixAll: false,
-  });
-  assert.deepStrictEqual(requestedCodeActionKinds([CodeActionKind.SourceFixAll]), {
-    quickFix: false,
-    sourceFixAll: true,
-  });
-  assert.deepStrictEqual(requestedCodeActionKinds(["refactor"]), {
-    quickFix: false,
-    sourceFixAll: false,
-  });
+  assert.deepStrictEqual(kinds(), [CodeActionKind.QuickFix]);
+  assert.deepStrictEqual(kinds([CodeActionKind.QuickFix]), [CodeActionKind.QuickFix]);
+  assert.deepStrictEqual(kinds([CodeActionKind.Source]), [sourceFixAllTextlint]);
+  assert.deepStrictEqual(kinds([CodeActionKind.SourceFixAll]), [sourceFixAllTextlint]);
+  assert.deepStrictEqual(kinds([sourceFixAllTextlint]), [sourceFixAllTextlint]);
+  assert.deepStrictEqual(kinds([CodeActionKind.Empty]), [
+    CodeActionKind.QuickFix,
+    sourceFixAllTextlint,
+  ]);
+  assert.deepStrictEqual(kinds(["refactor"]), []);
+  assert.deepStrictEqual(kinds([]), []);
 });
 
 void test("code action core creates quick fixes and same-rule fixes", () => {

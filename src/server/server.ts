@@ -18,7 +18,7 @@ import {
   defaultServerInitializationOptions,
   type ServerInitializationOptions,
 } from "../shared/types.ts";
-import { sourceFixAllTextlint } from "./code-actions.ts";
+import { textlintCodeActionKinds } from "./code-actions.ts";
 import { createCodeActionHandler } from "./code-action-handler.ts";
 import { createValidationService } from "./validation.ts";
 import { createWorkspaceLinterService } from "./workspace-linters.ts";
@@ -120,7 +120,7 @@ connection.onInitialize(() => ({
   capabilities: {
     textDocumentSync: TextDocumentSyncKind.Full,
     codeActionProvider: {
-      codeActionKinds: ["quickfix", sourceFixAllTextlint],
+      codeActionKinds: [...textlintCodeActionKinds],
     },
     workspace: {
       workspaceFolders: {
