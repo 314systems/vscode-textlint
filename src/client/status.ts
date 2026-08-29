@@ -1,5 +1,4 @@
-import { window, StatusBarAlignment } from "vscode";
-import type { TextEditor } from "vscode";
+import * as vscode from "vscode";
 
 type StatusLogger = Readonly<{
   info: (message: string, data?: unknown) => void;
@@ -38,7 +37,7 @@ export const Status = {
 } as const satisfies Record<"OK" | "WARN" | "ERROR", StatusInfo>;
 
 export class StatusBar {
-  private readonly delegate = window.createStatusBarItem(StatusBarAlignment.Right, 0);
+  private readonly delegate = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
   private readonly supports: readonly string[];
   private currentStatus: StatusInfo = Status.OK;
   private isServerRunning = false;
@@ -46,7 +45,7 @@ export class StatusBar {
   constructor(supports: readonly string[]) {
     this.supports = supports;
     this.delegate.text = this.currentStatus.label;
-    window.onDidChangeActiveTextEditor((editor) => {
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
       this.updateWith(editor);
     });
     this.update();
@@ -94,17 +93,17 @@ export class StatusBar {
 
   setServerRunning(serverRunning: boolean) {
     this.isServerRunning = serverRunning;
-    void window.showInformationMessage(
+    void vscode.window.showInformationMessage(
       serverRunning ? "textlint server is running." : "textlint server stopped.",
     );
     this.update();
   }
 
   update() {
-    this.updateWith(window.activeTextEditor);
+    this.updateWith(vscode.window.activeTextEditor);
   }
 
-  updateWith(editor: TextEditor | undefined) {
+  updateWith(editor: vscode.TextEditor | undefined) {
     this.delegate.text = this.status.label;
     const languageId = editor?.document.languageId ?? "";
     this.activate(languageId);

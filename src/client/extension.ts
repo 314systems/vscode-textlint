@@ -1,5 +1,4 @@
-import { workspace, window, commands } from "vscode";
-import type { ExtensionContext, QuickPickItem, WorkspaceFolder } from "vscode";
+import * as vscode from "vscode";
 
 import { State, ErrorHandler, CloseAction, RevealOutputChannelOn } from "vscode-languageclient";
 
@@ -35,7 +34,7 @@ export interface ExtensionInternal {
   readonly statusBar: StatusBar;
 }
 
-export async function activate(context: ExtensionContext): Promise<ExtensionInternal> {
+export async function activate(context: vscode.ExtensionContext): Promise<ExtensionInternal> {
   const client = newClient(context);
   const statusBar = new StatusBar(readConfig().languages);
   client.onDidChangeState((event) => {
@@ -68,8 +67,8 @@ You need to reopen the workspace after installing textlint.`,
     client.info(p.message, p.verbose);
   });
   context.subscriptions.push(
-    commands.registerCommand("textlint.createConfig", createConfig),
-    commands.registerCommand("textlint.showOutputChannel", () => {
+    vscode.commands.registerCommand("textlint.createConfig", createConfig),
+    vscode.commands.registerCommand("textlint.showOutputChannel", () => {
       client.outputChannel.show();
     }),
     client,
@@ -83,7 +82,7 @@ You need to reopen the workspace after installing textlint.`,
   };
 }
 
-function newClient(context: ExtensionContext): LanguageClient {
+function newClient(context: vscode.ExtensionContext): LanguageClient {
   const module = URIUtils.joinPath(context.extensionUri, "dist", "server.js").fsPath;
   const debugOptions = { execArgv: ["--nolazy", "--inspect=6011"] };
   const serverOptions: ServerOptions = {
@@ -101,10 +100,10 @@ function newClient(context: ExtensionContext): LanguageClient {
     revealOutputChannelOn: RevealOutputChannelOn.Error,
     synchronize: {
       fileEvents: [
-        workspace.createFileSystemWatcher("**/package.json"),
-        workspace.createFileSystemWatcher("**/.textlintrc"),
-        workspace.createFileSystemWatcher("**/.textlintrc.{js,json,yml,yaml}"),
-        workspace.createFileSystemWatcher("**/.textlintignore"),
+        vscode.workspace.createFileSystemWatcher("**/package.json"),
+        vscode.workspace.createFileSystemWatcher("**/.textlintrc"),
+        vscode.workspace.createFileSystemWatcher("**/.textlintrc.{js,json,yml,yaml}"),
+        vscode.workspace.createFileSystemWatcher("**/.textlintignore"),
       ],
     },
     initializationFailedHandler: (error) => {
@@ -132,9 +131,9 @@ function newClient(context: ExtensionContext): LanguageClient {
 }
 
 async function createConfig() {
-  const folders = workspace.workspaceFolders;
+  const folders = vscode.workspace.workspaceFolders;
   if (!folders) {
-    await window.showErrorMessage(
+    await vscode.window.showErrorMessage(
       "An textlint configuration can only be generated if VS Code is opened on a workspace folder.",
     );
     return;
@@ -143,14 +142,16 @@ async function createConfig() {
   const noConfigs = await filterNoConfigFolders(folders);
 
   if (noConfigs.length === 0 && folders.length > 0) {
-    await window.showErrorMessage("textlint configuration file already exists in this workspace.");
+    await vscode.window.showErrorMessage(
+      "textlint configuration file already exists in this workspace.",
+    );
     return;
   }
 
   if (noConfigs.length === 1) {
     await emitConfig(noConfigs[0]);
   } else {
-    const item = await window.showQuickPick(toQuickPickItems(noConfigs));
+    const item = await vscode.window.showQuickPick(toQuickPickItems(noConfigs));
     if (item) {
       await emitConfig(item.folder);
     }
@@ -158,8 +159,8 @@ async function createConfig() {
 }
 
 async function filterNoConfigFolders(
-  folders: readonly WorkspaceFolder[],
-): Promise<WorkspaceFolder[]> {
+  folders: readonly vscode.WorkspaceFolder[],
+): Promise<vscode.WorkspaceFolder[]> {
   const results = await Promise.all(
     folders.map(async (folder) => {
       const candidates = ["", ".js", ".yaml", ".yml", ".json"].map((ext) =>
@@ -168,7 +169,7 @@ async function filterNoConfigFolders(
       const existing = await Promise.all(
         candidates.map(async (configPath) => {
           try {
-            await workspace.fs.stat(configPath);
+            await vscode.workspace.fs.stat(configPath);
             return true;
           } catch {
             return false;
@@ -181,8 +182,8 @@ async function filterNoConfigFolders(
   return results.filter((folder) => folder !== undefined);
 }
 
-async function emitConfig(folder: WorkspaceFolder) {
-  await workspace.fs.writeFile(
+async function emitConfig(folder: vscode.WorkspaceFolder) {
+  await vscode.workspace.fs.writeFile(
     URIUtils.joinPath(folder.uri, ".textlintrc"),
     Buffer.from(
       `{
@@ -195,8 +196,8 @@ async function emitConfig(folder: WorkspaceFolder) {
 }
 
 function toQuickPickItems(
-  folders: readonly WorkspaceFolder[],
-): ({ folder: WorkspaceFolder } & QuickPickItem)[] {
+  folders: readonly vscode.WorkspaceFolder[],
+): ({ folder: vscode.WorkspaceFolder } & vscode.QuickPickItem)[] {
   return folders.map((folder) => {
     return {
       label: folder.name,
@@ -207,7 +208,7 @@ function toQuickPickItems(
 }
 
 function readConfig(): ExtensionSettings {
-  const config = workspace.getConfiguration("textlint");
+  const config = vscode.workspace.getConfiguration("textlint");
   return {
     languages: config.get("languages", defaultConfig.languages),
     configPath: config.get("configPath", defaultConfig.configPath),
