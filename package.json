@@ -20,7 +20,6 @@
   "main": "./dist/extension.js",
   "scripts": {
     "clean": "rimraf dist out",
-    "tsc": "tsc -p ./",
     "type-check": "tsc --noEmit",
     "build": "rspack build --mode production",
     "watch": "rspack build --mode development --watch",

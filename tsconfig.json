@@ -1,17 +1,15 @@
 {
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "rewriteRelativeImportExtensions": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "target": "ES2023",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "noEmit": true,
     "strict": true,
-    "esModuleInterop": true,
-    "outDir": "out",
-    "rootDir": ".",
-    "lib": ["ES2023", "DOM"],
-    "types": ["node", "vscode"],
-    "sourceMap": true
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "rspack.config.ts"],
-  "exclude": ["node_modules", ".vscode-test", "dist", "out"]
+  "include": ["src", "tests", "rspack.config.ts"],
+  "exclude": ["node_modules", ".vscode-test"]
 }
