@@ -30,50 +30,37 @@ jobs:
           node-version-file: .tool-versions
           cache: npm
       - run: npm ci
-      - run: npm run test:e2e
+      - name: Run E2E tests
+        run: npm run test:e2e
   linux:
     name: Linux
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      DISPLAY: ":99"
     steps:
       - uses: actions/checkout@v7.0.1
-      - run: |
+      - name: Install VS Code runtime libraries
+        run: |
           sudo apt-get update
-          sudo apt-get install -y libxkbfile-dev pkg-config libsecret-1-dev libxss1 dbus dbus-x11 xvfb libgtk-3-0 libgbm1 libasound2t64 libcairo2
-          # DBus settings
-          dbus-launch --auto-syntax > /tmp/dbus.env
-          cat /tmp/dbus.env
-          # Xvfb settings
-          sudo Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset > /dev/null 2>&1 &
+          sudo apt-get install -y --no-install-recommends libasound2t64 libgbm1 libgtk-3-0t64 libnss3
       - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .tool-versions
           cache: npm
       - run: npm ci
       - name: Run E2E tests
-        run: |
-          source /tmp/dbus.env
-          npm run test:e2e
+        run: xvfb-run -a npm run test:e2e
   darwin:
     # Disabled due to instability issues
     if: false
     name: macOS
     runs-on: macos-latest
     timeout-minutes: 30
-    env:
-      DISPLAY: ":99"
     steps:
       - uses: actions/checkout@v7.0.1
-      - run: |
-          brew install --cask xquartz
-      - run: |
-          /usr/X11/bin/Xvfb :99 -screen 0 1024x768x24 &
-          sleep 5
       - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .tool-versions
           cache: npm
       - run: npm ci
-      - run: npm run test:e2e
+      - name: Run E2E tests
+        run: npm run test:e2e
