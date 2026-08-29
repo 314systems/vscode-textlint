@@ -37,30 +37,18 @@ export interface WorkspaceLinterDiscovery {
   readonly resolveModule: (root: string) => Promise<TextlintModule>;
 }
 
-function configCandidates(root: string): string[] {
-  return fs.globSync(configCandidatePattern(root));
-}
-
-export interface ConfigFileCandidates {
-  readonly workspace: () => string | undefined;
-  readonly configured: () => string | undefined;
-  readonly home: () => string | undefined;
-}
-
-export function selectConfigFile(candidates: ConfigFileCandidates): string | undefined {
-  return candidates.workspace() ?? candidates.configured() ?? candidates.home();
+function configCandidate(root: string): string | undefined {
+  return fs.globSync(configCandidatePattern(root)).at(0);
 }
 
 function findConfig(dependencies: WorkspaceLinterDependencies, root: string): string | undefined {
-  const settings = dependencies.settings();
-  return selectConfigFile({
-    workspace: () => configCandidates(root)[0],
-    configured: () =>
-      settings.configPath !== null && fs.existsSync(settings.configPath)
-        ? settings.configPath
-        : undefined,
-    home: () => configCandidates(os.homedir())[0],
-  });
+  const workspaceConfig = configCandidate(root);
+  if (workspaceConfig !== undefined) return workspaceConfig;
+
+  const { configPath } = dependencies.settings();
+  if (configPath !== null && fs.existsSync(configPath)) return configPath;
+
+  return configCandidate(os.homedir());
 }
 
 function findIgnore(dependencies: WorkspaceLinterDependencies, root: string): string | undefined {

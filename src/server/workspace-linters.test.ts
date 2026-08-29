@@ -2,31 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   createWorkspaceLinterService,
-  selectConfigFile,
   type WorkspaceLinterDependencies,
   type WorkspaceLinterDiscovery,
 } from "./workspace-linters.ts";
-
-void test("config lookup stops after finding a workspace configuration", () => {
-  const explored: string[] = [];
-  const configFile = selectConfigFile({
-    workspace: () => {
-      explored.push("workspace");
-      return "/workspace/.textlintrc.json";
-    },
-    configured: () => {
-      explored.push("configured");
-      return "/configured/.textlintrc.json";
-    },
-    home: () => {
-      explored.push("home");
-      return "/home/user/.textlintrc.json";
-    },
-  });
-
-  assert.strictEqual(configFile, "/workspace/.textlintrc.json");
-  assert.deepStrictEqual(explored, ["workspace"]);
-});
 
 void test("workspace linter reports missing configuration before missing library", async () => {
   const events: string[] = [];
