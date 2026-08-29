@@ -41,34 +41,33 @@
     "package": "vsce package --no-dependencies"
   },
   "dependencies": {
-    "minimatch": "^3.0.4",
-    "vscode-languageclient": "^10.1.0",
-    "vscode-languageserver": "^10.1.0",
-    "vscode-languageserver-textdocument": "^1.0.12",
-    "vscode-uri": "^3.1.0"
+    "minimatch": "10.2.6",
+    "vscode-languageclient": "10.1.0",
+    "vscode-languageserver": "10.1.0",
+    "vscode-languageserver-textdocument": "1.0.14",
+    "vscode-uri": "3.2.0"
   },
   "devDependencies": {
-    "@rspack/cli": "^2.1.1",
-    "@rspack/core": "^2.1.1",
-    "@textlint/types": "^15.7.1",
-    "@types/node": "^22.20.0",
+    "@rspack/cli": "2.2.1",
+    "@rspack/core": "2.2.1",
+    "@textlint/types": "15.8.0",
+    "@types/node": "^22",
     "@types/vscode": "^1.100.0",
-    "@vscode/test-electron": "^3.1.0",
-    "@vscode/vsce": "^3.9.2",
-    "merge-options": "^3.0.4",
-    "npm-check-updates": "^11.8.5",
-    "npm-run-all": "^4.1.5",
-    "oxfmt": "^0.64.0",
-    "oxlint": "^1.79.0",
-    "oxlint-tsgolint": "^7.0.2001",
-    "rimraf": "^3.0.2",
-    "sort-package-json": "^1.52.0",
-    "textlint": "^15.7.1",
-    "textlint-filter-rule-comments": "^1.2.2",
-    "textlint-rule-prh": "^6.0.0",
-    "textlint-rule-rousseau": "^1.4.8",
-    "textlint-rule-unexpanded-acronym": "^1.2.4",
-    "typescript": "^7.0.2"
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "3.9.2",
+    "npm-check-updates": "23.1.0",
+    "npm-run-all2": "9.0.3",
+    "oxfmt": "0.65.0",
+    "oxlint": "1.79.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "rimraf": "6.1.3",
+    "sort-package-json": "4.0.0",
+    "textlint": "15.8.0",
+    "textlint-filter-rule-comments": "1.3.0",
+    "textlint-rule-prh": "6.1.0",
+    "textlint-rule-rousseau": "1.4.8",
+    "textlint-rule-unexpanded-acronym": "1.2.4",
+    "typescript": "7.0.2"
   },
   "contributes": {
     "commands": [
@@ -163,5 +162,6 @@
   "engines": {
     "node": ">=24.0.0 <25.0.0",
     "vscode": "^1.100.0"
-  }
+  },
+  "packageManager": "npm@12.0.2+sha512.b885e890b9418fa1693544d05f53e64f9a73ec194837d4258b15fecdd692347b1dd2a517b1b0cbaf9d31cd8e92c3b70956bd2ecc72833a57b4b3098f5bfa7943"
 }

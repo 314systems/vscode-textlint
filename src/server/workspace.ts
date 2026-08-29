@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import minimatch from "minimatch";
+import { minimatch } from "minimatch";
 import { URI } from "vscode-uri";
 import type { createLinter } from "textlint";
 import type { TextDocument } from "vscode-languageserver-textdocument";
