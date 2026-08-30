@@ -10,33 +10,33 @@
 // NOTE: We do not use `"type": "npm"` because VS Code may incorrectly choose the package manager.
 // cf. https://github.com/microsoft/vscode/issues/170101
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "npm: tsc",
-      "type": "shell",
-      "command": "npm run tsc",
-      "group": "build",
-      "presentation": {
-        "panel": "dedicated",
-        "reveal": "never"
-      },
-      "problemMatcher": ["$tsc", "$ts-webpack"]
-    },
-    {
-      "label": "npm: watch",
-      "type": "shell",
-      "command": "npm run watch",
-      "isBackground": true,
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "presentation": {
-        "panel": "dedicated",
-        "reveal": "never"
-      },
-      "problemMatcher": ["$tsc-watch", "$ts-webpack-watch"]
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "npm: tsc",
+			"type": "shell",
+			"command": "npm run tsc",
+			"group": "build",
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "never"
+			},
+			"problemMatcher": ["$tsc", "$ts-webpack"]
+		},
+		{
+			"label": "npm: watch",
+			"type": "shell",
+			"command": "npm run watch",
+			"isBackground": true,
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "never"
+			},
+			"problemMatcher": ["$tsc-watch", "$ts-webpack-watch"]
+		}
+	]
 }

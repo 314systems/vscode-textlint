@@ -1,0 +1,8 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"ignorePatterns": ["tests/fixtures/**"],
+	"sortImports": true,
+	"sortPackageJson": true,
+	"useTabs": true,
+	"singleQuote": true
+}

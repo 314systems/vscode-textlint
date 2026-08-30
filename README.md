@@ -29,9 +29,9 @@ When working with new projects, you might need to create a `.textlintrc` configu
 
     ```json
     {
-      "editor.codeActionsOnSave": {
-        "source.fixAll.textlint": "explicit"
-      }
+    	"editor.codeActionsOnSave": {
+    		"source.fixAll.textlint": "explicit"
+    	}
     }
     ```
 

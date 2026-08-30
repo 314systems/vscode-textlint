@@ -1,23 +1,23 @@
 {
-  "folders": [
-    {
-      "path": ".",
-    },
-  ],
-  "settings": {
-    "editor.defaultFormatter": "oxc.oxc-vscode",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.oxc": "explicit",
-    },
-    "typescript.tsdk": "./node_modules/typescript/lib",
-    "npm.packageManager": "npm",
-  },
-  "extensions": {
-    "recommendations": [
-      "amodio.tsl-problem-matcher",
-      "editorconfig.editorconfig",
-      "oxc.oxc-vscode",
-    ],
-  },
+	"folders": [
+		{
+			"path": ".",
+		},
+	],
+	"settings": {
+		"editor.defaultFormatter": "oxc.oxc-vscode",
+		"editor.formatOnSave": true,
+		"editor.codeActionsOnSave": {
+			"source.fixAll.oxc": "explicit",
+		},
+		"typescript.tsdk": "./node_modules/typescript/lib",
+		"npm.packageManager": "npm",
+	},
+	"extensions": {
+		"recommendations": [
+			"amodio.tsl-problem-matcher",
+			"editorconfig.editorconfig",
+			"oxc.oxc-vscode",
+		],
+	},
 }

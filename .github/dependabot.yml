@@ -10,7 +10,7 @@ updates:
     groups:
       github-actions:
         patterns:
-          - "*"
+          - '*'
 
   - package-ecosystem: npm
     directory: /
@@ -23,7 +23,7 @@ updates:
       # @types/vscode determines the minimum supported VS Code version:
       # vsce refuses to package when it exceeds engines.vscode. Raising it
       # drops support for older editors, so bump it deliberately.
-      - dependency-name: "@types/vscode"
+      - dependency-name: '@types/vscode'
     groups:
       language-server:
         patterns:
@@ -34,7 +34,7 @@ updates:
       textlint:
         patterns:
           - textlint
-          - "@textlint/*"
+          - '@textlint/*'
           - textlint-rule-*
           - textlint-filter-rule-*
       oxc:
@@ -44,7 +44,7 @@ updates:
           - oxlint-tsgolint
       rspack:
         patterns:
-          - "@rspack/*"
+          - '@rspack/*'
       dev-dependencies:
         dependency-type: development
         update-types:

@@ -1,60 +1,60 @@
-import { NotificationType } from "vscode-languageserver";
+import { NotificationType } from 'vscode-languageserver';
 
-export type RunMode = "onSave" | "onType";
+export type RunMode = 'onSave' | 'onType';
 
 export interface ServerInitializationOptions {
-  readonly configPath: string | null;
-  readonly ignorePath: string | null;
-  readonly nodePath: string | null;
-  readonly run: RunMode;
-  readonly targetPath: string;
+	readonly configPath: string | null;
+	readonly ignorePath: string | null;
+	readonly nodePath: string | null;
+	readonly run: RunMode;
+	readonly targetPath: string;
 }
 
 export interface ExtensionSettings extends ServerInitializationOptions {
-  languages: string[];
+	languages: string[];
 }
 
 export const defaultServerInitializationOptions: ServerInitializationOptions = {
-  configPath: null,
-  ignorePath: null,
-  nodePath: null,
-  run: "onSave",
-  targetPath: "",
+	configPath: null,
+	ignorePath: null,
+	nodePath: null,
+	run: 'onSave',
+	targetPath: '',
 };
 
 export namespace ExitNotification {
-  export interface ExitParams {
-    code: number;
-    message: string;
-  }
-  export const type = new NotificationType<ExitParams>("textlint/exit");
+	export interface ExitParams {
+		code: number;
+		message: string;
+	}
+	export const type = new NotificationType<ExitParams>('textlint/exit');
 }
 
 export namespace StatusNotification {
-  export enum Status {
-    OK = 1,
-    WARN = 2,
-    ERROR = 3,
-  }
-  export interface StatusParams {
-    status: Status;
-    message?: string;
-    cause?: unknown;
-  }
-  export const type = new NotificationType<StatusParams>("textlint/status");
+	export enum Status {
+		OK = 1,
+		WARN = 2,
+		ERROR = 3,
+	}
+	export interface StatusParams {
+		status: Status;
+		message?: string;
+		cause?: unknown;
+	}
+	export const type = new NotificationType<StatusParams>('textlint/status');
 }
 
 export namespace NoConfigNotification {
-  export const type = new NotificationType<Params>("textlint/noconfig");
+	export const type = new NotificationType<Params>('textlint/noconfig');
 
-  export interface Params {
-    workspaceFolder: string;
-  }
+	export interface Params {
+		workspaceFolder: string;
+	}
 }
 
 export namespace NoLibraryNotification {
-  export const type = new NotificationType<Params>("textlint/nolibrary");
-  export interface Params {
-    workspaceFolder: string;
-  }
+	export const type = new NotificationType<Params>('textlint/nolibrary');
+	export interface Params {
+		workspaceFolder: string;
+	}
 }
