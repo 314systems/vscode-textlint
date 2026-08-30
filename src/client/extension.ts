@@ -1,9 +1,14 @@
 import * as vscode from 'vscode';
-import { State, ErrorHandler, CloseAction, RevealOutputChannelOn } from 'vscode-languageclient';
+import {
+	State,
+	type ErrorHandler,
+	CloseAction,
+	RevealOutputChannelOn,
+} from 'vscode-languageclient';
 import {
 	LanguageClient,
-	LanguageClientOptions,
-	ServerOptions,
+	type LanguageClientOptions,
+	type ServerOptions,
 	TransportKind,
 } from 'vscode-languageclient/node';
 import { Utils as URIUtils } from 'vscode-uri';
@@ -13,7 +18,7 @@ import {
 	NoConfigNotification,
 	NoLibraryNotification,
 	ExitNotification,
-	ExtensionSettings,
+	type ExtensionSettings,
 	defaultServerInitializationOptions,
 } from '../shared/types';
 import { LanguageStatus } from './status';
