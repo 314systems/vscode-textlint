@@ -14,7 +14,6 @@ void test("workspace linter reports missing configuration before missing library
       ignorePath: null,
       nodePath: null,
       run: "onSave",
-      trace: "off",
       targetPath: "",
     }),
     trace: () => {},

@@ -5,7 +5,6 @@ import { State, ErrorHandler, CloseAction, RevealOutputChannelOn } from "vscode-
 import {
   LanguageClient,
   LanguageClientOptions,
-  LogTraceNotification,
   ServerOptions,
   TransportKind,
 } from "vscode-languageclient/node";
@@ -21,8 +20,8 @@ import {
   defaultServerInitializationOptions,
 } from "../shared/types";
 
-import { Status, StatusBar } from "./status";
-import type { StatusInfo } from "./status";
+import { LanguageStatus } from "./status";
+import type { StatusLevel } from "./status";
 
 const defaultConfig: ExtensionSettings = {
   ...defaultServerInitializationOptions,
@@ -31,40 +30,49 @@ const defaultConfig: ExtensionSettings = {
 
 export interface ExtensionInternal {
   readonly client: LanguageClient;
-  readonly statusBar: StatusBar;
+  readonly status: LanguageStatus;
+}
+
+function reportServerState(status: LanguageStatus, state: State): void {
+  status.busy = state === State.Starting;
+  switch (state) {
+    case State.Starting:
+      break;
+    case State.Running:
+      status.report("ok");
+      break;
+    case State.Stopped:
+      status.report("error", "textlint server stopped.");
+      break;
+    case State.StartFailed:
+      status.report("error", "textlint server failed to start.");
+      break;
+  }
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<ExtensionInternal> {
   const client = newClient(context);
-  const statusBar = new StatusBar(readConfig().languages);
+  const status = new LanguageStatus(readConfig().languages, client);
   client.onDidChangeState((event) => {
-    statusBar.setServerRunning(event.newState === State.Running);
+    reportServerState(status, event.newState);
   });
   client.onNotification(StatusNotification.type, (params) => {
-    statusBar.setStatus(to(params.status));
-    if (params.message !== undefined || params.cause !== undefined) {
-      statusBar.status.log(client, params.message ?? "", params.cause);
-    }
+    status.report(toLevel(params.status), params.message, params.cause);
   });
   client.onNotification(NoConfigNotification.type, (params) => {
-    statusBar.setStatus(Status.WARN);
-    statusBar.status.log(
-      client,
+    status.report(
+      "warn",
       `No textlint configuration (e.g .textlintrc) found in ${params.workspaceFolder} .
 File will not be validated. Consider running the 'Create .textlintrc file' command.`,
     );
   });
   client.onNotification(NoLibraryNotification.type, (params) => {
-    statusBar.setStatus(Status.WARN);
-    statusBar.status.log(
-      client,
+    status.report(
+      "warn",
       `Failed to load the textlint library in ${params.workspaceFolder} .
 To use textlint in this workspace please install textlint using 'npm install textlint' or globally using 'npm install -g textlint'.
 You need to reopen the workspace after installing textlint.`,
     );
-  });
-  client.onNotification(LogTraceNotification.type, (p) => {
-    client.info(p.message, p.verbose);
   });
   context.subscriptions.push(
     vscode.commands.registerCommand("textlint.createConfig", createConfig),
@@ -72,13 +80,13 @@ You need to reopen the workspace after installing textlint.`,
       client.outputChannel.show();
     }),
     client,
-    statusBar,
+    status,
   );
   await client.start();
   // for testing purpose
   return {
     client,
-    statusBar,
+    status,
   };
 }
 
@@ -215,20 +223,19 @@ function readConfig(): ExtensionSettings {
     ignorePath: config.get("ignorePath", defaultConfig.ignorePath),
     nodePath: config.get("nodePath", defaultConfig.nodePath),
     run: config.get("run", defaultConfig.run),
-    trace: config.get("trace", defaultConfig.trace),
     targetPath: config.get("targetPath", defaultConfig.targetPath),
   };
 }
 
-function to(status: StatusNotification.Status): StatusInfo {
+function toLevel(status: StatusNotification.Status): StatusLevel {
   switch (status) {
     case StatusNotification.Status.OK:
-      return Status.OK;
+      return "ok";
     case StatusNotification.Status.WARN:
-      return Status.WARN;
+      return "warn";
     case StatusNotification.Status.ERROR:
-      return Status.ERROR;
+      return "error";
     default:
-      return Status.ERROR;
+      return "error";
   }
 }

@@ -6,7 +6,7 @@ checkedTest("Extension tests > Activate extension", async () => {
   const { extension, internals } = await setupExtension();
   assert.ok(extension.isActive, "Extension should be active");
   assert.notStrictEqual(internals.client, undefined, "Language client should be initialized");
-  assert.notStrictEqual(internals.statusBar, undefined, "Status bar should be initialized");
+  assert.notStrictEqual(internals.status, undefined, "Language status should be initialized");
 });
 
 checkedTest("Extension tests > Commands registration", async () => {

@@ -133,16 +133,6 @@
           "default": "onSave",
           "description": "Run the linter on save (onSave) or on type (onType)"
         },
-        "textlint.trace": {
-          "type": "string",
-          "enum": [
-            "off",
-            "messages",
-            "verbose"
-          ],
-          "default": "off",
-          "description": "Traces the communication between VSCode and the textlint linter service."
-        },
         "textlint.targetPath": {
           "type": "string",
           "default": "",

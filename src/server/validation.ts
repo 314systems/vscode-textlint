@@ -19,7 +19,6 @@ export interface ValidationDependencies {
   readonly withProgress: <T>(task: () => Promise<T>) => Promise<T>;
   readonly sendOk: () => void;
   readonly sendError: (error: unknown) => void;
-  readonly sendErrors: (errors: readonly string[]) => void;
 }
 
 interface ValidationContext {
@@ -127,33 +126,31 @@ async function validateDocument(context: ValidationContext, document: TextDocume
   }
 }
 
-function validateSingle(context: ValidationContext, document: TextDocument): Promise<void> {
-  return context.dependencies.withProgress(async () => {
-    try {
-      await validateDocument(context, document);
-      context.dependencies.sendOk();
-    } catch (error) {
-      context.dependencies.sendError(error);
-    }
-  });
-}
-
-function validateMany(
+function validateAll(
   context: ValidationContext,
   documents: readonly TextDocument[],
 ): Promise<void> {
   return context.dependencies.withProgress(async () => {
-    const errors: string[] = [];
+    const failures = new Map<string, unknown>();
     await Promise.all(
       documents.map(async (document) => {
         try {
           await validateDocument(context, document);
         } catch (error) {
-          errors.push(error instanceof Error ? error.message : String(error));
+          const message = error instanceof Error ? error.message : String(error);
+          if (!failures.has(message)) {
+            failures.set(message, error);
+          }
         }
       }),
     );
-    context.dependencies.sendErrors(errors);
+    if (failures.size === 0) {
+      context.dependencies.sendOk();
+      return;
+    }
+    for (const error of failures.values()) {
+      context.dependencies.sendError(error);
+    }
   });
 }
 
@@ -161,7 +158,7 @@ function openDocument(context: ValidationContext, document: TextDocument): void 
   context.dependencies.trace(`onDidOpen ${document.uri}`);
   if (document.uri.startsWith("file:") && !context.repositories.has(document.uri)) {
     context.repositories.set(document.uri, { repository: emptyFixRepository() });
-    void validateSingle(context, document);
+    void validateAll(context, [document]);
   }
 }
 
@@ -196,8 +193,8 @@ export function createValidationService(dependencies: ValidationDependencies): V
       closeDocument(context, document);
     },
     validate: (document: TextDocument) => validateDocument(context, document),
-    validateSingle: (document: TextDocument) => validateSingle(context, document),
-    validateMany: (documents: readonly TextDocument[]) => validateMany(context, documents),
+    validateSingle: (document: TextDocument) => validateAll(context, [document]),
+    validateMany: (documents: readonly TextDocument[]) => validateAll(context, documents),
     prepareRevalidation: () => prepareRevalidation(context),
     repository: (uri: string) => context.repositories.get(uri),
   };

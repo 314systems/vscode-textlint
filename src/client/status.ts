@@ -6,110 +6,81 @@ type StatusLogger = Readonly<{
   error: (message: string, data?: unknown) => void;
 }>;
 
-export interface StatusInfo {
-  readonly label: string;
-  readonly color: string;
+export type StatusLevel = "ok" | "warn" | "error";
+
+interface StatusPresentation {
+  readonly text: string;
+  readonly severity: vscode.LanguageStatusSeverity;
   readonly log: (logger: StatusLogger, message: string, data?: unknown) => void;
 }
 
-export const Status = {
-  OK: {
-    label: "textlint",
-    color: "",
+const presentations = {
+  ok: {
+    text: "textlint",
+    severity: vscode.LanguageStatusSeverity.Information,
     log(logger, message, data) {
       logger.info(message, data);
     },
   },
-  WARN: {
-    label: "textlint: Warning",
-    color: "yellow",
+  warn: {
+    text: "textlint: Warning",
+    severity: vscode.LanguageStatusSeverity.Warning,
     log(logger, message, data) {
       logger.warn(message, data);
     },
   },
-  ERROR: {
-    label: "textlint: Error",
-    color: "darkred",
+  error: {
+    text: "textlint: Error",
+    severity: vscode.LanguageStatusSeverity.Error,
     log(logger, message, data) {
       logger.error(message, data);
     },
   },
-} as const satisfies Record<"OK" | "WARN" | "ERROR", StatusInfo>;
+} as const satisfies Record<StatusLevel, StatusPresentation>;
 
-export class StatusBar {
-  private readonly delegate = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
-  private readonly supports: readonly string[];
-  private currentStatus: StatusInfo = Status.OK;
-  private isServerRunning = false;
+export class LanguageStatus {
+  private readonly item: vscode.LanguageStatusItem;
+  private readonly logger: StatusLogger;
+  private currentLevel: StatusLevel = "ok";
 
-  constructor(supports: readonly string[]) {
-    this.supports = supports;
-    this.delegate.text = this.currentStatus.label;
-    vscode.window.onDidChangeActiveTextEditor((editor) => {
-      this.updateWith(editor);
-    });
-    this.update();
+  constructor(supports: readonly string[], logger: StatusLogger) {
+    this.logger = logger;
+    this.item = vscode.languages.createLanguageStatusItem(
+      "textlint.status",
+      supports.map((language) => ({ language, scheme: "file" })),
+    );
+    this.item.name = "textlint";
+    this.item.command = {
+      command: "textlint.showOutputChannel",
+      title: "Show Output",
+    };
+    this.report("ok");
   }
 
   dispose() {
-    this.delegate.dispose();
+    this.item.dispose();
   }
 
-  show(show: boolean) {
-    if (show) {
-      this.delegate.show();
-    } else {
-      this.delegate.hide();
+  get level(): StatusLevel {
+    return this.currentLevel;
+  }
+
+  get busy(): boolean {
+    return this.item.busy;
+  }
+
+  set busy(busy: boolean) {
+    this.item.busy = busy;
+  }
+
+  report(level: StatusLevel, message?: string, data?: unknown) {
+    const presentation = presentations[level];
+    this.currentLevel = level;
+    this.item.severity = presentation.severity;
+    this.item.text = presentation.text;
+    this.item.detail = message?.split("\n", 1)[0];
+    if (message !== undefined) {
+      presentation.log(this.logger, message, data);
     }
-  }
-
-  activate(languageId: string) {
-    if (languageId === "") {
-      return;
-    }
-
-    if (this.supports.includes(languageId)) {
-      this.delegate.color = "";
-      this.delegate.tooltip =
-        "need to restart this extension or check this extension setting and .textlintrc if textlint is not working.";
-    } else {
-      this.delegate.color = "#818589";
-      this.delegate.tooltip = `textlint is inactive on ${languageId}.`;
-    }
-  }
-
-  get status(): StatusInfo {
-    return this.currentStatus;
-  }
-
-  setStatus(status: Readonly<StatusInfo>) {
-    this.currentStatus = status;
-    this.update();
-  }
-
-  get serverRunning(): boolean {
-    return this.isServerRunning;
-  }
-
-  setServerRunning(serverRunning: boolean) {
-    this.isServerRunning = serverRunning;
-    void vscode.window.showInformationMessage(
-      serverRunning ? "textlint server is running." : "textlint server stopped.",
-    );
-    this.update();
-  }
-
-  update() {
-    this.updateWith(vscode.window.activeTextEditor);
-  }
-
-  updateWith(editor: vscode.TextEditor | undefined) {
-    this.delegate.text = this.status.label;
-    const languageId = editor?.document.languageId ?? "";
-    this.activate(languageId);
-
-    const shouldShowStatusBar =
-      !this.serverRunning || this.currentStatus !== Status.OK || this.supports.includes(languageId);
-    this.show(shouldShowStatusBar);
   }
 }

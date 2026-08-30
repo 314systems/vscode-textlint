@@ -10,8 +10,5 @@
 			"path": "../single-root-workspace"
 		}
 	],
-	"settings": {
-		"textlint.trace": "verbose"
-    
-	},
+	"settings": {},
 }

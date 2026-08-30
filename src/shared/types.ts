@@ -1,14 +1,12 @@
 import { NotificationType } from "vscode-languageserver";
 
 export type RunMode = "onSave" | "onType";
-export type TraceMode = "off" | "messages" | "verbose";
 
 export interface ServerInitializationOptions {
   readonly configPath: string | null;
   readonly ignorePath: string | null;
   readonly nodePath: string | null;
   readonly run: RunMode;
-  readonly trace: TraceMode;
   readonly targetPath: string;
 }
 
@@ -21,7 +19,6 @@ export const defaultServerInitializationOptions: ServerInitializationOptions = {
   ignorePath: null,
   nodePath: null,
   run: "onSave",
-  trace: "off",
   targetPath: "",
 };
 

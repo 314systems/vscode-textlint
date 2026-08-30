@@ -39,8 +39,6 @@ When working with new projects, you might need to create a `.textlintrc` configu
   - Controls when the linter runs. Options: `onSave` or `onType`. Default: `onSave`.
 - `textlint.nodePath`
   - Use this setting if an installed textlint package can't be detected, for example `/myGlobalNodePackages/node_modules`.
-- `textlint.trace`
-  - Traces the communication between VS Code and the textlint linter service.
 - `textlint.configPath`
   - Absolute path to textlint config file.
   - Workspace settings take priority over this setting.
@@ -51,6 +49,12 @@ When working with new projects, you might need to create a `.textlintrc` configu
   - A glob pattern relative to the workspace folder that selects files to lint. Leave empty to lint all supported files.
 - `textlint.languages`
   - Languages to lint with textlint.
+
+## Troubleshooting
+
+The extension logs to the `textlint` output channel. To see the detailed diagnostic logs, run **Developer: Set Log Level...** from the Command palette, pick `textlint`, and choose `Debug`.
+
+To trace the protocol messages exchanged with the language server, set `textlint.trace.server` to `messages` or `verbose`.
 
 ## Commands
 
