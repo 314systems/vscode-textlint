@@ -6,7 +6,6 @@ import {
 	type ServerOptions,
 	TransportKind,
 } from 'vscode-languageclient/node';
-import { Utils as URIUtils } from 'vscode-uri';
 
 import { StatusNotification, type TextlintSettings, defaultServerSettings } from '../shared/types';
 import { LanguageStatus } from './status';
@@ -16,6 +15,12 @@ const defaultConfig: TextlintSettings = {
 	...defaultServerSettings,
 	languages: [],
 };
+
+const configFileNames = ['', '.js', '.yaml', '.yml', '.json'].map((ext) => `.textlintrc${ext}`);
+
+const initialConfigContent = new TextEncoder().encode(
+	JSON.stringify({ filters: {}, rules: {} }, null, 2),
+);
 
 export interface ExtensionInternal {
 	readonly client: LanguageClient;
@@ -57,15 +62,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 		status,
 	);
 	await client.start();
-	// for testing purpose
-	return {
-		client,
-		status,
-	};
+
+	return { client, status };
 }
 
 function newClient(context: vscode.ExtensionContext): LanguageClient {
-	const module = URIUtils.joinPath(context.extensionUri, 'dist', 'server.js').fsPath;
+	const module = vscode.Uri.joinPath(context.extensionUri, 'dist', 'server.js').fsPath;
 	const debugOptions = { execArgv: ['--nolazy', '--inspect=6011'] };
 	const serverOptions: ServerOptions = {
 		run: { module, transport: TransportKind.ipc },
@@ -95,18 +97,26 @@ function newClient(context: vscode.ExtensionContext): LanguageClient {
 	return client;
 }
 
-async function createConfig() {
+/**
+ * Handler for the `textlint.createConfig` command.
+ *
+ * Only folders that {@link filterNoConfigFolders} reports as config-less are
+ * offered, so an existing configuration is never overwritten. A single candidate
+ * is written straight away; several prompt for which one to use. Nothing to do,
+ * in either direction, is reported through an error notification.
+ */
+async function createConfig(): Promise<void> {
 	const folders = vscode.workspace.workspaceFolders;
-	if (!folders) {
+	if (!folders?.length) {
 		await vscode.window.showErrorMessage(
-			'An textlint configuration can only be generated if VS Code is opened on a workspace folder.',
+			'A textlint configuration can only be generated if VS Code is opened on a workspace folder.',
 		);
 		return;
 	}
 
 	const noConfigs = await filterNoConfigFolders(folders);
 
-	if (noConfigs.length === 0 && folders.length > 0) {
+	if (noConfigs.length === 0) {
 		await vscode.window.showErrorMessage(
 			'textlint configuration file already exists in this workspace.',
 		);
@@ -115,61 +125,71 @@ async function createConfig() {
 
 	if (noConfigs.length === 1) {
 		await emitConfig(noConfigs[0]);
-	} else {
-		const item = await vscode.window.showQuickPick(toQuickPickItems(noConfigs));
-		if (item) {
-			await emitConfig(item.folder);
-		}
+		return;
 	}
-}
 
-async function filterNoConfigFolders(
-	folders: readonly vscode.WorkspaceFolder[],
-): Promise<vscode.WorkspaceFolder[]> {
-	const results = await Promise.all(
-		folders.map(async (folder) => {
-			const candidates = ['', '.js', '.yaml', '.yml', '.json'].map((ext) =>
-				URIUtils.joinPath(folder.uri, '.textlintrc' + ext),
-			);
-			const existing = await Promise.all(
-				candidates.map(async (configPath) => {
-					try {
-						await vscode.workspace.fs.stat(configPath);
-						return true;
-					} catch {
-						return false;
-					}
-				}),
-			);
-			return existing.includes(true) ? undefined : folder;
-		}),
-	);
-	return results.filter((folder) => folder !== undefined);
-}
-
-async function emitConfig(folder: vscode.WorkspaceFolder) {
-	await vscode.workspace.fs.writeFile(
-		URIUtils.joinPath(folder.uri, '.textlintrc'),
-		Buffer.from(
-			`{
-  "filters": {},
-  "rules": {}
-}`,
-			'utf8',
-		),
-	);
-}
-
-function toQuickPickItems(
-	folders: readonly vscode.WorkspaceFolder[],
-): ({ folder: vscode.WorkspaceFolder } & vscode.QuickPickItem)[] {
-	return folders.map((folder) => {
-		return {
+	const item = await vscode.window.showQuickPick(
+		noConfigs.map((folder) => ({
 			label: folder.name,
 			description: folder.uri.path,
 			folder,
-		};
-	});
+		})),
+	);
+	if (item) {
+		await emitConfig(item.folder);
+	}
+}
+
+/**
+ * Narrows workspace folders down to the ones that have no textlint configuration.
+ *
+ * Folders are probed in parallel and the survivors keep their original order,
+ * which is the order the quick pick presents them in.
+ *
+ * @param folders Workspace folders to probe.
+ * @returns The subset of `folders` that {@link hasConfig} rejected.
+ */
+async function filterNoConfigFolders(
+	folders: readonly vscode.WorkspaceFolder[],
+): Promise<vscode.WorkspaceFolder[]> {
+	const configured = await Promise.all(folders.map(hasConfig));
+	return folders.filter((_, index) => !configured[index]);
+}
+
+/**
+ * Reports whether the folder root holds any of the {@link configFileNames} variants.
+ *
+ * `Promise.any` settles on the first stat that succeeds and rejects only once every
+ * candidate has failed, so a file that cannot be stat'd counts as absent. Nested
+ * directories are not searched: only the folder root is a candidate location.
+ *
+ * @param folder Workspace folder whose root is probed.
+ */
+async function hasConfig(folder: vscode.WorkspaceFolder): Promise<boolean> {
+	const stats = configFileNames.map((name) =>
+		vscode.workspace.fs.stat(vscode.Uri.joinPath(folder.uri, name)),
+	);
+	try {
+		await Promise.any(stats);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Writes an empty starter `.textlintrc` at the root of the given folder.
+ *
+ * The write is unconditional and replaces any existing file, so callers must
+ * pass a folder that {@link filterNoConfigFolders} reported as config-less.
+ *
+ * @param folder Workspace folder to create the configuration file in.
+ */
+async function emitConfig(folder: vscode.WorkspaceFolder): Promise<void> {
+	await vscode.workspace.fs.writeFile(
+		vscode.Uri.joinPath(folder.uri, '.textlintrc'),
+		initialConfigContent,
+	);
 }
 
 function readConfig(): TextlintSettings {
