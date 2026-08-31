@@ -7,9 +7,8 @@ import {
 	TransportKind,
 } from 'vscode-languageclient/node';
 
-import { StatusNotification, type TextlintSettings, defaultServerSettings } from '../shared/types';
+import { type TextlintSettings, defaultServerSettings, statusNotification } from '../shared/types';
 import { LanguageStatus } from './status';
-import type { StatusLevel } from './status';
 
 const defaultConfig: TextlintSettings = {
 	...defaultServerSettings,
@@ -27,31 +26,27 @@ export interface ExtensionInternal {
 	readonly status: LanguageStatus;
 }
 
-function reportServerState(status: LanguageStatus, state: State): void {
-	status.busy = state === State.Starting;
-	switch (state) {
-		case State.Starting:
-			break;
-		case State.Running:
-			status.report('ok');
-			break;
-		case State.Stopped:
-			status.report('error', 'textlint server stopped.');
-			break;
-		case State.StartFailed:
-			status.report('error', 'textlint server failed to start.');
-			break;
-	}
-}
-
 export async function activate(context: vscode.ExtensionContext): Promise<ExtensionInternal> {
 	const client = newClient(context);
 	const status = new LanguageStatus(readConfig().languages, client);
-	client.onDidChangeState((event) => {
-		reportServerState(status, event.newState);
+	client.onDidChangeState(({ newState }) => {
+		// Starting only raises the spinner; the text keeps the previous outcome
+		// until the server either comes up or fails.
+		status.busy = newState === State.Starting;
+		switch (newState) {
+			case State.Running:
+				status.reportServer('ok');
+				break;
+			case State.Stopped:
+				status.reportServer('error', 'textlint server stopped.');
+				break;
+			case State.StartFailed:
+				status.reportServer('error', 'textlint server failed to start.');
+				break;
+		}
 	});
-	client.onNotification(StatusNotification.type, (params) => {
-		status.report(toLevel(params.status), params.message, params.cause);
+	client.onNotification(statusNotification, (params) => {
+		status.reportLint(params.status, params.message, params.cause);
 	});
 	context.subscriptions.push(
 		vscode.commands.registerCommand('textlint.createConfig', createConfig),
@@ -73,11 +68,8 @@ function newClient(context: vscode.ExtensionContext): LanguageClient {
 		run: { module, transport: TransportKind.ipc },
 		debug: { module, transport: TransportKind.ipc, options: debugOptions },
 	};
-	const textlintConfig = readConfig();
 	const clientOptions: LanguageClientOptions = {
-		documentSelector: textlintConfig.languages.map((id) => {
-			return { language: id, scheme: 'file' };
-		}),
+		documentSelector: readConfig().languages.map((language) => ({ language, scheme: 'file' })),
 		diagnosticCollectionName: 'textlint',
 		revealOutputChannelOn: RevealOutputChannelOn.Error,
 		synchronize: {
@@ -88,6 +80,9 @@ function newClient(context: vscode.ExtensionContext): LanguageClient {
 				vscode.workspace.createFileSystemWatcher('**/.textlintignore'),
 			],
 		},
+		// Logs exactly what the built-in fallback logs, but without its modal error
+		// dialog: a failed start is already visible in the language status item.
+		// Returning false leaves the retry to the user rather than looping on it.
 		initializationFailedHandler: (error) => {
 			client.error('Server initialization failed.', error);
 			return false;
@@ -202,17 +197,4 @@ function readConfig(): TextlintSettings {
 		run: config.get('run', defaultConfig.run),
 		targetPath: config.get('targetPath', defaultConfig.targetPath),
 	};
-}
-
-function toLevel(status: StatusNotification.Status): StatusLevel {
-	switch (status) {
-		case StatusNotification.Status.OK:
-			return 'ok';
-		case StatusNotification.Status.WARN:
-			return 'warn';
-		case StatusNotification.Status.ERROR:
-			return 'error';
-		default:
-			return 'error';
-	}
 }

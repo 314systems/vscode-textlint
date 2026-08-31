@@ -10,7 +10,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 
-import { StatusNotification, defaultServerSettings, type ServerSettings } from '../shared/types.ts';
+import { defaultServerSettings, statusNotification, type ServerSettings } from '../shared/types.ts';
 import { createCodeActionHandler } from './code-action-handler.ts';
 import { textlintCodeActionKinds } from './code-actions.ts';
 import { createValidationService } from './validation.ts';
@@ -35,16 +35,16 @@ function errorMessage(error: unknown): string {
 }
 
 function sendError(error: unknown): void {
-	void connection.sendNotification(StatusNotification.type, {
-		status: StatusNotification.Status.ERROR,
+	void connection.sendNotification(statusNotification, {
+		status: 'error',
 		message: errorMessage(error),
 		cause: error instanceof Error ? error.stack : undefined,
 	});
 }
 
 function sendWarning(message: string): void {
-	void connection.sendNotification(StatusNotification.type, {
-		status: StatusNotification.Status.WARN,
+	void connection.sendNotification(statusNotification, {
+		status: 'warn',
 		message,
 	});
 }
@@ -87,8 +87,8 @@ const validation = createValidationService({
 	},
 	withProgress: withValidationProgress,
 	sendOk: () => {
-		void connection.sendNotification(StatusNotification.type, {
-			status: StatusNotification.Status.OK,
+		void connection.sendNotification(statusNotification, {
+			status: 'ok',
 		});
 	},
 	sendError,

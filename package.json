@@ -97,26 +97,33 @@
 						"latex",
 						"doctex"
 					],
-					"type": [
-						"array"
-					],
+					"type": "array",
 					"items": {
 						"type": "string"
 					},
 					"description": "Languages to lint with textlint."
 				},
 				"textlint.configPath": {
-					"type": "string",
+					"type": [
+						"string",
+						"null"
+					],
 					"default": null,
 					"description": "An absolute path to textlint config file."
 				},
 				"textlint.ignorePath": {
-					"type": "string",
+					"type": [
+						"string",
+						"null"
+					],
 					"default": null,
 					"description": "An absolute path to textlint ignore file."
 				},
 				"textlint.nodePath": {
-					"type": "string",
+					"type": [
+						"string",
+						"null"
+					],
 					"default": null,
 					"description": "A path added to NODE_PATH when resolving the textlint module."
 				},

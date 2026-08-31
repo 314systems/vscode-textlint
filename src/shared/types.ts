@@ -21,16 +21,12 @@ export const defaultServerSettings: ServerSettings = {
 	targetPath: '',
 };
 
-export namespace StatusNotification {
-	export enum Status {
-		OK = 1,
-		WARN = 2,
-		ERROR = 3,
-	}
-	export interface StatusParams {
-		status: Status;
-		message?: string;
-		cause?: unknown;
-	}
-	export const type = new NotificationType<StatusParams>('textlint/status');
+export type StatusLevel = 'ok' | 'warn' | 'error';
+
+export interface StatusParams {
+	status: StatusLevel;
+	message?: string;
+	cause?: unknown;
 }
+
+export const statusNotification = new NotificationType<StatusParams>('textlint/status');
