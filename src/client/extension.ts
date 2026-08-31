@@ -7,14 +7,11 @@ import {
 	TransportKind,
 } from 'vscode-languageclient/node';
 
-import { type TextlintSettings, defaultServerSettings, statusNotification } from '../shared/types';
+import { type RunMode, statusNotification } from '../shared/types';
 import { LanguageStatus } from './status';
 
-const defaultConfig: TextlintSettings = {
-	...defaultServerSettings,
-	languages: [],
-	run: 'onSave',
-};
+const defaultLanguages: readonly string[] = [];
+const defaultRun: RunMode = 'onSave';
 
 const configFileNames = ['', '.js', '.yaml', '.yml', '.json'].map((ext) => `.textlintrc${ext}`);
 
@@ -29,7 +26,7 @@ export interface ExtensionInternal {
 
 export async function activate(context: vscode.ExtensionContext): Promise<ExtensionInternal> {
 	const client = newClient(context);
-	const status = new LanguageStatus(readConfig().languages, client);
+	const status = new LanguageStatus(readLanguages(), client);
 	client.onDidChangeState(({ newState }) => {
 		// Starting only raises the spinner; the text keeps the previous outcome
 		// until the server either comes up or fails.
@@ -70,14 +67,14 @@ function newClient(context: vscode.ExtensionContext): LanguageClient {
 		debug: { module, transport: TransportKind.ipc, options: debugOptions },
 	};
 	const clientOptions: LanguageClientOptions = {
-		documentSelector: readConfig().languages.map((language) => ({ language, scheme: 'file' })),
+		documentSelector: readLanguages().map((language) => ({ language, scheme: 'file' })),
 		diagnosticPullOptions: {
 			onChange: true,
 			onSave: true,
 			filter: (document, mode) => {
 				const run = vscode.workspace
 					.getConfiguration('textlint', document.uri)
-					.get('run', defaultConfig.run);
+					.get('run', defaultRun);
 				return mode === DiagnosticPullMode.onType ? run !== 'onType' : run !== 'onSave';
 			},
 		},
@@ -197,14 +194,12 @@ async function emitConfig(folder: vscode.WorkspaceFolder): Promise<void> {
 	);
 }
 
-function readConfig(): TextlintSettings {
-	const config = vscode.workspace.getConfiguration('textlint');
-	return {
-		languages: config.get('languages', defaultConfig.languages),
-		configPath: config.get('configPath', defaultConfig.configPath),
-		ignorePath: config.get('ignorePath', defaultConfig.ignorePath),
-		nodePath: config.get('nodePath', defaultConfig.nodePath),
-		run: config.get('run', defaultConfig.run),
-		targetPath: config.get('targetPath', defaultConfig.targetPath),
-	};
+/**
+ * Reads the languages textlint is enabled for.
+ *
+ * The remaining settings are pulled by the server itself through
+ * `workspace/configuration`, so the client only ever needs this one.
+ */
+function readLanguages(): readonly string[] {
+	return vscode.workspace.getConfiguration('textlint').get('languages', defaultLanguages);
 }
