@@ -95,9 +95,12 @@ export class LanguageStatus {
 		return this.serverEntry.level === 'ok' ? this.lintEntry : this.serverEntry;
 	}
 
+	// Notifications stay off: the status item is the surface for these, and a
+	// toast on every report is noise -- State.Stopped alone fires on a clean
+	// shutdown and on each restart, not just on a server that gave up.
 	private log(level: StatusLevel, message?: string, data?: unknown) {
 		if (message !== undefined) {
-			this.logger[presentations[level].log](message, data);
+			this.logger[presentations[level].log](message, data, false);
 		}
 	}
 

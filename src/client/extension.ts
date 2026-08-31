@@ -88,10 +88,11 @@ function newClient(context: vscode.ExtensionContext): LanguageClient {
 			],
 		},
 		// Logs exactly what the built-in fallback logs, but without its modal error
-		// dialog: a failed start is already visible in the language status item.
+		// dialog and without a notification: a failed start is already visible in
+		// the language status item, and the output channel keeps the detail.
 		// Returning false leaves the retry to the user rather than looping on it.
 		initializationFailedHandler: (error) => {
-			client.error('Server initialization failed.', error);
+			client.error('Server initialization failed.', error, false);
 			return false;
 		},
 	};
