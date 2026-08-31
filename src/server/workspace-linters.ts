@@ -17,6 +17,7 @@ import {
 
 type TextlintModule = Pick<typeof import('textlint'), 'createLinter' | 'loadTextlintrc'>;
 type LinterMap = Map<string, WorkspaceLinter>;
+type LinterEntry = readonly [string, WorkspaceLinter];
 
 export interface WorkspaceLinterDependencies {
 	readonly settings: () => ServerSettings;
@@ -31,6 +32,14 @@ export interface WorkspaceLinterDiscovery {
 	readonly findConfig: (root: string) => string | undefined;
 	readonly findIgnore: (root: string) => string | undefined;
 	readonly resolveModule: (root: string) => Promise<TextlintModule>;
+}
+
+export function requiresLinterRebuild(previous: ServerSettings, next: ServerSettings): boolean {
+	return (
+		previous.configPath !== next.configPath ||
+		previous.ignorePath !== next.ignorePath ||
+		previous.nodePath !== next.nodePath
+	);
 }
 
 function configCandidate(root: string): string | undefined {
@@ -99,9 +108,8 @@ async function resolveWorkspaceModule(
 async function configureFolder(
 	dependencies: WorkspaceLinterDependencies,
 	discovery: WorkspaceLinterDiscovery,
-	linters: LinterMap,
 	folder: WorkspaceFolder,
-): Promise<void> {
+): Promise<LinterEntry | undefined> {
 	dependencies.trace(`configureEngine ${folder.uri}`);
 	const root = URI.parse(folder.uri).fsPath;
 	try {
@@ -114,15 +122,19 @@ async function configureFolder(
 		const descriptor = await module.loadTextlintrc({
 			configFilePath: configFile,
 		});
-		linters.set(folder.uri, {
-			linter: module.createLinter({
-				descriptor,
-				ignoreFilePath: ignoreFile,
-			}),
-			availableExtensions: descriptor.availableExtensions,
-		});
+		return [
+			folder.uri,
+			{
+				linter: module.createLinter({
+					descriptor,
+					ignoreFilePath: ignoreFile,
+				}),
+				availableExtensions: descriptor.availableExtensions,
+			},
+		];
 	} catch (error) {
 		dependencies.trace('failed to configureEngine', error);
+		return undefined;
 	}
 }
 
@@ -145,12 +157,13 @@ export function createWorkspaceLinterService(
 	dependencies: WorkspaceLinterDependencies,
 	discovery: WorkspaceLinterDiscovery = createDiscovery(dependencies),
 ) {
-	const linters = new Map<string, WorkspaceLinter>();
+	let linters = new Map<string, WorkspaceLinter>();
 	return {
 		configure: async (folders: readonly WorkspaceFolder[] | null) => {
-			await Promise.all(
-				(folders ?? []).map((folder) => configureFolder(dependencies, discovery, linters, folder)),
+			const entries = await Promise.all(
+				(folders ?? []).map((folder) => configureFolder(dependencies, discovery, folder)),
 			);
+			linters = new Map(entries.filter((entry): entry is LinterEntry => entry !== undefined));
 		},
 		remove: (folderUri: string) => {
 			linters.delete(folderUri);

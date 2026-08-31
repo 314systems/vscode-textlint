@@ -3,34 +3,17 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import type { TestContext } from 'node:test';
 
-import { commands, extensions, Uri, workspace } from 'vscode';
-import type { Disposable, Extension } from 'vscode';
-import { PublishDiagnosticsNotification } from 'vscode-languageclient/node';
-import type { Diagnostic } from 'vscode-languageclient/node';
-
-import type { ExtensionInternal } from '../../src/client/extension.ts';
+import * as vscode from 'vscode';
 
 const testPromises: Promise<void>[] = [];
 const TEST_TIMEOUT = 90_000;
 const DIAGNOSTICS_TIMEOUT = 10_000;
 
-export { PublishDiagnosticsNotification };
-
-let extension: Extension<ExtensionInternal>;
-let internals: ExtensionInternal;
-
 export function checkedTest(
 	name: string,
 	function_: (context: TestContext) => Promise<void> | void,
 ): void {
-	const testPromise = new Promise<void>((resolve, reject) => {
-		void test(name, { timeout: TEST_TIMEOUT }, (context) => {
-			const result = Promise.resolve().then(() => function_(context));
-			void result.then(resolve, reject);
-			return result;
-		});
-	});
-	testPromises.push(testPromise);
+	testPromises.push(test(name, { timeout: TEST_TIMEOUT }, function_));
 }
 
 export async function waitForEditorStabilization(timeMilliseconds = 1_000): Promise<void> {
@@ -54,28 +37,19 @@ export async function waitForCondition(
 	return waitForCondition(condition, maximumAttempts - 1, intervalMilliseconds);
 }
 
-export async function setupExtension(): Promise<{
-	extension: Extension<ExtensionInternal>;
-	internals: ExtensionInternal;
-}> {
-	const loadedExtension = extensions.getExtension<ExtensionInternal>('3w36zj6.textlint');
+export async function setupExtension(): Promise<vscode.Extension<unknown>> {
+	const loadedExtension = vscode.extensions.getExtension('3w36zj6.textlint');
 	if (!loadedExtension) {
 		throw new Error('Extension not found');
 	}
 	if (!loadedExtension.isActive) {
 		await loadedExtension.activate();
 	}
-	extension = loadedExtension;
-	internals = loadedExtension.exports;
-	return { extension, internals };
-}
-
-export function extensionInternals(): ExtensionInternal {
-	return internals;
+	return loadedExtension;
 }
 
 export function getWorkspaceRoot(): string {
-	const folders = workspace.workspaceFolders;
+	const folders = vscode.workspace.workspaceFolders;
 	if (!folders) {
 		throw new Error('Workspace folder not found');
 	}
@@ -83,49 +57,48 @@ export function getWorkspaceRoot(): string {
 }
 
 export function waitForDiagnostics(
-	uri: Uri,
-	accept: (diagnostics: readonly Diagnostic[]) => boolean = (diagnostics) => diagnostics.length > 0,
-): Promise<Diagnostic[]> {
+	uri: vscode.Uri,
+	accept: (diagnostics: readonly vscode.Diagnostic[]) => boolean = (diagnostics) =>
+		diagnostics.length > 0,
+): Promise<vscode.Diagnostic[]> {
 	return new Promise((resolve, reject) => {
-		const disposable = internals.client.onNotification(
-			PublishDiagnosticsNotification.type,
-			(params) => {
-				if (params.uri === uri.toString() && accept(params.diagnostics)) {
-					clearTimeout(timeout);
-					disposable.dispose();
-					resolve(params.diagnostics);
-				}
-			},
-		);
+		const finishIfAccepted = (): void => {
+			const diagnostics = vscode.languages.getDiagnostics(uri);
+			if (!accept(diagnostics)) return;
+			clearTimeout(timeout);
+			disposable.dispose();
+			resolve(diagnostics);
+		};
+		const disposable = vscode.languages.onDidChangeDiagnostics((event) => {
+			if (event.uris.some((changed) => changed.toString() === uri.toString())) {
+				finishIfAccepted();
+			}
+		});
 		const timeout = setTimeout(() => {
 			disposable.dispose();
-			reject(new Error(`Diagnostics were not published for ${uri.toString()}`));
+			reject(new Error(`Diagnostics did not change for ${uri.toString()}`));
 		}, DIAGNOSTICS_TIMEOUT);
+		finishIfAccepted();
 	});
 }
 
 export async function setupServerFixture(
 	context: TestContext,
 	testFileName = 'testtest2.txt',
-): Promise<{ testFile: string; disposables: Disposable[] }> {
+): Promise<{ testFile: string }> {
 	await setupExtension();
 	const rootPath = getWorkspaceRoot();
 	const sourceFile = path.join(rootPath, 'testtest.txt');
 	const testFile = path.join(rootPath, testFileName);
-	const disposables: Disposable[] = [];
 
 	context.after(async () => {
-		await commands.executeCommand('workbench.action.closeAllEditors');
+		await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 		await fs.rm(testFile, { force: true });
-		for (const disposable of disposables) {
-			disposable.dispose();
-		}
 	});
 	await fs.cp(sourceFile, testFile);
-	return { testFile, disposables };
+	return { testFile };
 }
 
 export async function testsDone(): Promise<void> {
 	await Promise.all(testPromises);
-	await waitForEditorStabilization(250);
 }

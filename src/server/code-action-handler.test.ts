@@ -8,7 +8,7 @@ import { createCodeActionHandler } from './code-action-handler.ts';
 import { sourceFixAllTextlint } from './code-actions.ts';
 import { convertMessages } from './diagnostics.ts';
 import { textlintMessage } from './test-fixtures.ts';
-import type { PublishedDiagnostics } from './validation.ts';
+import type { LintResult } from './validation.ts';
 
 const uri = 'file:///test.txt';
 const fixAllRequest = {
@@ -17,21 +17,21 @@ const fixAllRequest = {
 	context: { diagnostics: [], only: [sourceFixAllTextlint] },
 };
 
-function publishedFor(version: number): PublishedDiagnostics {
+function resultFor(version: number): LintResult {
 	return { version, ...convertMessages([textlintMessage('spell', [0, 3], 'you')]) };
 }
 
 void test('code action handler rejects validation from a replaced document lifecycle', async () => {
 	let document = TextDocument.create(uri, 'plaintext', 1, 'yuo');
-	let published: PublishedDiagnostics = { version: -1, diagnostics: [], fixes: [] };
+	let current: LintResult = { version: -1, diagnostics: [], fixes: [] };
 	const handler = createCodeActionHandler({
 		document: () => document,
-		published: () => published,
+		current: () => current,
 		validate: () => {
 			// A fresh instance is what TextDocuments hands out after a close and reopen.
 			document = TextDocument.create(uri, 'plaintext', 1, 'yuo');
-			published = publishedFor(1);
-			return Promise.resolve();
+			current = resultFor(1);
+			return Promise.resolve(current);
 		},
 		trace: () => {},
 		sendError: () => {},
@@ -44,11 +44,15 @@ void test('code action handler rejects validation from a replaced document lifec
 
 void test('code action handler serves fixes for an unchanged document', async () => {
 	const document = TextDocument.create(uri, 'plaintext', 1, 'yuo');
-	const published = publishedFor(1);
+	const current = resultFor(1);
+	let validations = 0;
 	const handler = createCodeActionHandler({
 		document: () => document,
-		published: () => published,
-		validate: () => Promise.resolve(),
+		current: () => current,
+		validate: () => {
+			validations += 1;
+			return Promise.resolve(current);
+		},
 		trace: () => {},
 		sendError: () => {},
 	});
@@ -59,4 +63,5 @@ void test('code action handler serves fixes for an unchanged document', async ()
 		actions.map((action) => action.title),
 		['Fix all auto-fixable textlint problems'],
 	);
+	assert.strictEqual(validations, 0);
 });

@@ -11,13 +11,12 @@ export interface TextlintSettings {
 	readonly targetPath: string;
 }
 
-export type ServerSettings = Omit<TextlintSettings, 'languages'>;
+export type ServerSettings = Omit<TextlintSettings, 'languages' | 'run'>;
 
 export const defaultServerSettings: ServerSettings = {
 	configPath: null,
 	ignorePath: null,
 	nodePath: null,
-	run: 'onSave',
 	targetPath: '',
 };
 

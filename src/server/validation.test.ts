@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { CancellationTokenSource } from 'vscode-languageserver/node';
 
 import { textlintMessage } from './test-fixtures.ts';
 import { createValidationService } from './validation.ts';
@@ -13,14 +14,12 @@ function createHarness() {
 	let document = TextDocument.create(uri, 'plaintext', 1, 'yuo');
 	let lint: WorkspaceLinter['linter']['lintText'] = () =>
 		Promise.resolve({ filePath: '/workspace/test.txt', messages: [] });
-	let lastRun: Promise<unknown> = Promise.resolve();
 	const service = createValidationService({
 		document: () => document,
 		settings: () => ({
 			configPath: null,
 			ignorePath: null,
 			nodePath: null,
-			run: 'onSave',
 			targetPath: '',
 		}),
 		lookupLinter: () => [
@@ -31,14 +30,6 @@ function createHarness() {
 			},
 		],
 		trace: () => {},
-		sendDiagnostics: () => {},
-		withProgress: (task) => {
-			const run = task();
-			lastRun = run;
-			return run;
-		},
-		sendOk: () => {},
-		sendError: () => {},
 	});
 	return {
 		service,
@@ -49,14 +40,10 @@ function createHarness() {
 		replaceDocument: (next: TextDocument) => {
 			document = next;
 		},
-		openSettled: async () => {
-			service.open(document);
-			await lastRun;
-		},
 	};
 }
 
-void test('validation stores the fixes next to the published diagnostics', async () => {
+void test('validation stores the fixes next to the diagnostics', async () => {
 	const harness = createHarness();
 	harness.setLint(() =>
 		Promise.resolve({
@@ -65,18 +52,17 @@ void test('validation stores the fixes next to the published diagnostics', async
 		}),
 	);
 
-	await harness.openSettled();
+	await harness.service.validate(harness.document());
 
-	const published = harness.service.published(uri);
-	assert.strictEqual(published?.version, 1);
-	assert.strictEqual(published.diagnostics.length, 1);
-	assert.strictEqual(published.fixes.length, 1);
-	assert.strictEqual(published.fixes[0].diagnostic, published.diagnostics[0]);
+	const current = harness.service.current(uri);
+	assert.strictEqual(current?.version, 1);
+	assert.strictEqual(current.diagnostics.length, 1);
+	assert.strictEqual(current.fixes.length, 1);
+	assert.strictEqual(current.fixes[0].diagnostic, current.diagnostics[0]);
 });
 
 void test('validation stamps a failed lint with the version the text was read at', async () => {
 	const harness = createHarness();
-	await harness.openSettled();
 	harness.setLint(() => {
 		// The edit lands while the lint is in flight; the failure must not be
 		// stamped with the newer version it never saw.
@@ -87,7 +73,7 @@ void test('validation stamps a failed lint with the version the text was read at
 	await assert.rejects(harness.service.validate(harness.document()), /lint failed/);
 
 	assert.strictEqual(harness.document().version, 2);
-	assert.deepStrictEqual(harness.service.published(uri), {
+	assert.deepStrictEqual(harness.service.current(uri), {
 		version: 1,
 		diagnostics: [],
 		fixes: [],
@@ -102,7 +88,7 @@ void test('validation discards a lint that finishes after the document was reope
 			messages: [textlintMessage('spell', [0, 3], 'you')],
 		}),
 	);
-	await harness.openSettled();
+	await harness.service.validate(harness.document());
 	const opened = harness.document();
 	// The gate exists before the lint starts, so releasing it cannot race the
 	// point at which the pending validation actually reaches lintText.
@@ -121,5 +107,39 @@ void test('validation discards a lint that finishes after the document was reope
 
 	// The reopened document keeps the result of its own lifecycle, not the
 	// empty result of the lint that outlived the previous one.
-	assert.strictEqual(harness.service.published(uri)?.diagnostics.length, 1);
+	assert.strictEqual(harness.service.current(uri)?.diagnostics.length, 1);
+});
+
+void test('validation discards a lint invalidated by reconfiguration', async () => {
+	const harness = createHarness();
+	let release!: () => void;
+	const gate = new Promise<{ filePath: string; messages: never[] }>((resolve) => {
+		release = () => {
+			resolve({ filePath: '/workspace/test.txt', messages: [] });
+		};
+	});
+	harness.setLint(() => gate);
+
+	const pending = harness.service.validate(harness.document());
+	harness.service.invalidate();
+	release();
+	await pending;
+
+	assert.strictEqual(harness.service.current(uri), undefined);
+});
+
+void test('validation skips a pull that the LSP client already cancelled', async () => {
+	const harness = createHarness();
+	let linted = false;
+	harness.setLint(() => {
+		linted = true;
+		return Promise.resolve({ filePath: '/workspace/test.txt', messages: [] });
+	});
+	const cancellation = new CancellationTokenSource();
+	cancellation.cancel();
+
+	const result = await harness.service.validate(harness.document(), cancellation.token);
+
+	assert.strictEqual(result, undefined);
+	assert.strictEqual(linted, false);
 });

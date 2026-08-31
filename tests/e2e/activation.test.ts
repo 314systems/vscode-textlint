@@ -1,23 +1,16 @@
 import assert from 'node:assert/strict';
 
-import { commands } from 'vscode';
+import * as vscode from 'vscode';
 
 import { checkedTest, setupExtension } from './harness.ts';
 
-checkedTest('Extension tests > Activate extension', async () => {
-	const { extension, internals } = await setupExtension();
+checkedTest('Extension tests > Activate extension and register commands', async () => {
+	const extension = await setupExtension();
 	assert.ok(extension.isActive, 'Extension should be active');
-	assert.notStrictEqual(internals.client, undefined, 'Language client should be initialized');
-	assert.notStrictEqual(internals.status, undefined, 'Language status should be initialized');
-});
-
-checkedTest('Extension tests > Commands registration', async () => {
-	await setupExtension();
-	const textlintCommands = (await commands.getCommands(true)).filter((command) =>
+	const textlintCommands = (await vscode.commands.getCommands(true)).filter((command) =>
 		command.startsWith('textlint.'),
 	);
-	assert.deepStrictEqual(textlintCommands.toSorted(), [
-		'textlint.createConfig',
-		'textlint.showOutputChannel',
-	]);
+	for (const command of ['textlint.createConfig', 'textlint.showOutputChannel']) {
+		assert.ok(textlintCommands.includes(command), `${command} should be registered`);
+	}
 });

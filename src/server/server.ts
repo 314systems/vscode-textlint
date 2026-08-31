@@ -5,6 +5,7 @@ import {
 	ConfigurationRequest,
 	createConnection,
 	DidChangeConfigurationNotification,
+	DocumentDiagnosticReportKind,
 	ProposedFeatures,
 	TextDocuments,
 	TextDocumentSyncKind,
@@ -14,7 +15,7 @@ import { defaultServerSettings, statusNotification, type ServerSettings } from '
 import { createCodeActionHandler } from './code-action-handler.ts';
 import { textlintCodeActionKinds } from './code-actions.ts';
 import { createValidationService } from './validation.ts';
-import { createWorkspaceLinterService } from './workspace-linters.ts';
+import { createWorkspaceLinterService, requiresLinterRebuild } from './workspace-linters.ts';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -49,14 +50,10 @@ function sendWarning(message: string): void {
 	});
 }
 
-async function withValidationProgress<T>(task: () => Promise<T>): Promise<T> {
-	const progress = await connection.window.createWorkDoneProgress();
-	progress.begin('textlint', undefined, 'Linting');
-	try {
-		return await task();
-	} finally {
-		progress.done();
-	}
+function sendOk(): void {
+	void connection.sendNotification(statusNotification, {
+		status: 'ok',
+	});
 }
 
 const workspaceLinters = createWorkspaceLinterService({
@@ -82,22 +79,25 @@ const validation = createValidationService({
 	settings: () => settings,
 	lookupLinter: workspaceLinters.lookup,
 	trace,
-	sendDiagnostics: (uri, diagnostics) => {
-		void connection.sendDiagnostics({ uri, diagnostics: [...diagnostics] });
-	},
-	withProgress: withValidationProgress,
-	sendOk: () => {
-		void connection.sendNotification(statusNotification, {
-			status: 'ok',
-		});
-	},
-	sendError,
 });
+
+let reconfiguration = Promise.resolve();
+
+async function waitForReconfiguration(): Promise<void> {
+	let pending: Promise<void>;
+	do {
+		pending = reconfiguration;
+		await pending;
+	} while (pending !== reconfiguration);
+}
 
 const codeActions = createCodeActionHandler({
 	document: (uri) => documents.get(uri),
-	published: validation.published,
-	validate: validation.validate,
+	current: validation.current,
+	validate: async (document) => {
+		await waitForReconfiguration();
+		return validation.validate(document);
+	},
 	trace,
 	sendError,
 });
@@ -105,6 +105,11 @@ const codeActions = createCodeActionHandler({
 connection.onInitialize(() => ({
 	capabilities: {
 		textDocumentSync: TextDocumentSyncKind.Full,
+		diagnosticProvider: {
+			identifier: 'textlint',
+			interFileDependencies: false,
+			workspaceDiagnostics: false,
+		},
 		codeActionProvider: {
 			codeActionKinds: [...textlintCodeActionKinds],
 		},
@@ -117,18 +122,26 @@ connection.onInitialize(() => ({
 	},
 }));
 
-async function updateSettings(): Promise<void> {
+async function updateSettings(): Promise<ServerSettings> {
+	const previous = settings;
 	const configurations = await connection.sendRequest<ServerSettings[]>(
 		ConfigurationRequest.method,
 		{ items: [{ section: 'textlint' }] },
 	);
 	settings = configurations[0] ?? defaultServerSettings;
+	return previous;
 }
 
-async function reConfigure(): Promise<void> {
-	trace('reConfigure');
-	await workspaceLinters.configure(await connection.workspace.getWorkspaceFolders());
-	await validation.validateMany(validation.prepareRevalidation());
+function reConfigure(): Promise<void> {
+	validation.invalidate();
+	reconfiguration = reconfiguration
+		.then(async () => {
+			trace('reConfigure');
+			await workspaceLinters.configure(await connection.workspace.getWorkspaceFolders());
+			await connection.languages.diagnostics.refresh();
+		})
+		.catch(sendError);
+	return reconfiguration;
 }
 
 connection.onInitialized(async () => {
@@ -144,9 +157,14 @@ connection.onInitialized(async () => {
 });
 
 connection.onDidChangeConfiguration(async () => {
-	await updateSettings();
+	const previous = await updateSettings();
 	trace('onDidChangeConfiguration', settings);
-	await reConfigure();
+	if (requiresLinterRebuild(previous, settings)) {
+		await reConfigure();
+	} else if (previous.targetPath !== settings.targetPath) {
+		validation.invalidate();
+		await connection.languages.diagnostics.refresh();
+	}
 });
 
 connection.onDidChangeWatchedFiles(async () => {
@@ -154,22 +172,23 @@ connection.onDidChangeWatchedFiles(async () => {
 	await reConfigure();
 });
 
-documents.onDidChangeContent((event) => {
-	trace(`onDidChangeContent ${event.document.uri}`, settings.run);
-	if (settings.run === 'onType') {
-		void validation.validateSingle(event.document);
+connection.languages.diagnostics.on(async (params, token) => {
+	await waitForReconfiguration();
+	const document = documents.get(params.textDocument.uri);
+	if (!document) {
+		return { kind: DocumentDiagnosticReportKind.Full, items: [] };
 	}
-});
-
-documents.onDidSave((event) => {
-	trace(`onDidSave ${event.document.uri}`, settings.run);
-	if (settings.run === 'onSave') {
-		void validation.validateSingle(event.document);
+	try {
+		const result = await validation.validate(document, token);
+		if (!result) {
+			return { kind: DocumentDiagnosticReportKind.Full, items: [] };
+		}
+		sendOk();
+		return { kind: DocumentDiagnosticReportKind.Full, items: [...result.diagnostics] };
+	} catch (error) {
+		sendError(error);
+		return { kind: DocumentDiagnosticReportKind.Full, items: [] };
 	}
-});
-
-documents.onDidOpen((event) => {
-	validation.open(event.document);
 });
 documents.onDidClose((event) => {
 	validation.close(event.document);

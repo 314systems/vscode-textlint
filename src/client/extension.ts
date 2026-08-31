@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { State, RevealOutputChannelOn } from 'vscode-languageclient';
+import { DiagnosticPullMode, State, RevealOutputChannelOn } from 'vscode-languageclient';
 import {
 	LanguageClient,
 	type LanguageClientOptions,
@@ -13,6 +13,7 @@ import { LanguageStatus } from './status';
 const defaultConfig: TextlintSettings = {
 	...defaultServerSettings,
 	languages: [],
+	run: 'onSave',
 };
 
 const configFileNames = ['', '.js', '.yaml', '.yml', '.json'].map((ext) => `.textlintrc${ext}`);
@@ -70,7 +71,16 @@ function newClient(context: vscode.ExtensionContext): LanguageClient {
 	};
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: readConfig().languages.map((language) => ({ language, scheme: 'file' })),
-		diagnosticCollectionName: 'textlint',
+		diagnosticPullOptions: {
+			onChange: true,
+			onSave: true,
+			filter: (document, mode) => {
+				const run = vscode.workspace
+					.getConfiguration('textlint', document.uri)
+					.get('run', defaultConfig.run);
+				return mode === DiagnosticPullMode.onType ? run !== 'onType' : run !== 'onSave';
+			},
+		},
 		revealOutputChannelOn: RevealOutputChannelOn.Error,
 		synchronize: {
 			fileEvents: [
