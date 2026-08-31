@@ -2,7 +2,8 @@ import { NotificationType } from 'vscode-languageserver';
 
 export type RunMode = 'onSave' | 'onType';
 
-export interface ServerInitializationOptions {
+export interface TextlintSettings {
+	readonly languages: readonly string[];
 	readonly configPath: string | null;
 	readonly ignorePath: string | null;
 	readonly nodePath: string | null;
@@ -10,25 +11,15 @@ export interface ServerInitializationOptions {
 	readonly targetPath: string;
 }
 
-export interface ExtensionSettings extends ServerInitializationOptions {
-	languages: string[];
-}
+export type ServerSettings = Omit<TextlintSettings, 'languages'>;
 
-export const defaultServerInitializationOptions: ServerInitializationOptions = {
+export const defaultServerSettings: ServerSettings = {
 	configPath: null,
 	ignorePath: null,
 	nodePath: null,
 	run: 'onSave',
 	targetPath: '',
 };
-
-export namespace ExitNotification {
-	export interface ExitParams {
-		code: number;
-		message: string;
-	}
-	export const type = new NotificationType<ExitParams>('textlint/exit');
-}
 
 export namespace StatusNotification {
 	export enum Status {
@@ -42,19 +33,4 @@ export namespace StatusNotification {
 		cause?: unknown;
 	}
 	export const type = new NotificationType<StatusParams>('textlint/status');
-}
-
-export namespace NoConfigNotification {
-	export const type = new NotificationType<Params>('textlint/noconfig');
-
-	export interface Params {
-		workspaceFolder: string;
-	}
-}
-
-export namespace NoLibraryNotification {
-	export const type = new NotificationType<Params>('textlint/nolibrary');
-	export interface Params {
-		workspaceFolder: string;
-	}
 }

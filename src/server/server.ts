@@ -10,13 +10,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 
-import {
-	NoConfigNotification,
-	NoLibraryNotification,
-	StatusNotification,
-	defaultServerInitializationOptions,
-	type ServerInitializationOptions,
-} from '../shared/types.ts';
+import { StatusNotification, defaultServerSettings, type ServerSettings } from '../shared/types.ts';
 import { createCodeActionHandler } from './code-action-handler.ts';
 import { textlintCodeActionKinds } from './code-actions.ts';
 import { createValidationService } from './validation.ts';
@@ -24,7 +18,7 @@ import { createWorkspaceLinterService } from './workspace-linters.ts';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
-let settings = defaultServerInitializationOptions;
+let settings = defaultServerSettings;
 
 documents.listen(connection);
 
@@ -48,6 +42,13 @@ function sendError(error: unknown): void {
 	});
 }
 
+function sendWarning(message: string): void {
+	void connection.sendNotification(StatusNotification.type, {
+		status: StatusNotification.Status.WARN,
+		message,
+	});
+}
+
 async function withValidationProgress<T>(task: () => Promise<T>): Promise<T> {
 	const progress = await connection.window.createWorkDoneProgress();
 	progress.begin('textlint', undefined, 'Linting');
@@ -62,10 +63,17 @@ const workspaceLinters = createWorkspaceLinterService({
 	settings: () => settings,
 	trace,
 	notifyNoConfig: (workspaceFolder) => {
-		void connection.sendNotification(NoConfigNotification.type, { workspaceFolder });
+		sendWarning(
+			`No textlint configuration (e.g .textlintrc) found in ${workspaceFolder} .
+File will not be validated. Consider running the 'Create .textlintrc file' command.`,
+		);
 	},
 	notifyNoLibrary: (workspaceFolder) => {
-		void connection.sendNotification(NoLibraryNotification.type, { workspaceFolder });
+		sendWarning(
+			`Failed to load the textlint library in ${workspaceFolder} .
+To use textlint in this workspace please install textlint using 'npm install textlint' or globally using 'npm install -g textlint'.
+You need to reopen the workspace after installing textlint.`,
+		);
 	},
 });
 
@@ -88,7 +96,7 @@ const validation = createValidationService({
 
 const codeActions = createCodeActionHandler({
 	document: (uri) => documents.get(uri),
-	repository: validation.repository,
+	published: validation.published,
 	validate: validation.validate,
 	trace,
 	sendError,
@@ -110,11 +118,11 @@ connection.onInitialize(() => ({
 }));
 
 async function updateSettings(): Promise<void> {
-	const configurations = await connection.sendRequest<ServerInitializationOptions[]>(
+	const configurations = await connection.sendRequest<ServerSettings[]>(
 		ConfigurationRequest.method,
 		{ items: [{ section: 'textlint' }] },
 	);
-	settings = configurations[0] ?? defaultServerInitializationOptions;
+	settings = configurations[0] ?? defaultServerSettings;
 }
 
 async function reConfigure(): Promise<void> {

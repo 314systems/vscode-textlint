@@ -1,42 +1,27 @@
 import * as vscode from 'vscode';
+import type { LanguageClient } from 'vscode-languageclient/node';
 
-type StatusLogger = Readonly<{
-	info: (message: string, data?: unknown) => void;
-	warn: (message: string, data?: unknown) => void;
-	error: (message: string, data?: unknown) => void;
-}>;
-
-export type StatusLevel = 'ok' | 'warn' | 'error';
-
-interface StatusPresentation {
-	readonly text: string;
-	readonly severity: vscode.LanguageStatusSeverity;
-	readonly log: (logger: StatusLogger, message: string, data?: unknown) => void;
-}
+type StatusLogger = Pick<LanguageClient, 'info' | 'warn' | 'error'>;
 
 const presentations = {
 	ok: {
 		text: 'textlint',
 		severity: vscode.LanguageStatusSeverity.Information,
-		log(logger, message, data) {
-			logger.info(message, data);
-		},
+		log: 'info',
 	},
 	warn: {
 		text: 'textlint: Warning',
 		severity: vscode.LanguageStatusSeverity.Warning,
-		log(logger, message, data) {
-			logger.warn(message, data);
-		},
+		log: 'warn',
 	},
 	error: {
 		text: 'textlint: Error',
 		severity: vscode.LanguageStatusSeverity.Error,
-		log(logger, message, data) {
-			logger.error(message, data);
-		},
+		log: 'error',
 	},
-} as const satisfies Record<StatusLevel, StatusPresentation>;
+} as const;
+
+export type StatusLevel = keyof typeof presentations;
 
 export class LanguageStatus {
 	private readonly item: vscode.LanguageStatusItem;
@@ -80,7 +65,7 @@ export class LanguageStatus {
 		this.item.text = presentation.text;
 		this.item.detail = message?.split('\n', 1)[0];
 		if (message !== undefined) {
-			presentation.log(this.logger, message, data);
+			this.logger[presentation.log](message, data);
 		}
 	}
 }

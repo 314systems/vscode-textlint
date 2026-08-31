@@ -2,7 +2,7 @@ import type { TextlintMessage } from '@textlint/types';
 import { DiagnosticSeverity, Position, Range } from 'vscode-languageserver/node';
 import type { Diagnostic } from 'vscode-languageserver/node';
 
-export type DiagnosticEntry = readonly [TextlintMessage, Diagnostic];
+import type { AutoFix } from './fixes.ts';
 
 export function toDiagnosticSeverity(severity: TextlintMessage['severity']): DiagnosticSeverity {
 	switch (severity) {
@@ -18,7 +18,7 @@ export function toDiagnosticSeverity(severity: TextlintMessage['severity']): Dia
 	}
 }
 
-export function toDiagnostic(message: TextlintMessage): DiagnosticEntry {
+export function toDiagnostic(message: TextlintMessage): Diagnostic {
 	const startPosition = Position.create(
 		Math.max(0, message.loc.start.line - 1),
 		Math.max(0, message.loc.start.column - 1),
@@ -35,14 +35,26 @@ export function toDiagnostic(message: TextlintMessage): DiagnosticEntry {
 		Math.max(0, message.loc.start.line - 1),
 		Math.max(0, message.loc.start.column - 1) + offset,
 	);
-	return [
-		message,
-		{
-			message: message.message,
-			severity: toDiagnosticSeverity(message.severity),
-			source: 'textlint',
-			range: Range.create(startPosition, endPosition),
-			code: message.ruleId,
-		},
-	];
+	return {
+		message: message.message,
+		severity: toDiagnosticSeverity(message.severity),
+		source: 'textlint',
+		range: Range.create(startPosition, endPosition),
+		code: message.ruleId,
+	};
+}
+
+// Pairs each fixable message's diagnostic with its fix at conversion time, so
+// nothing downstream has to correlate the two after the fact.
+export function convertMessages(messages: readonly TextlintMessage[]): {
+	readonly diagnostics: readonly Diagnostic[];
+	readonly fixes: readonly AutoFix[];
+} {
+	const diagnostics = messages.map((message) => toDiagnostic(message));
+	const fixes = messages.flatMap((message, index) =>
+		message.fix
+			? [{ ruleId: message.ruleId, fix: message.fix, diagnostic: diagnostics[index] }]
+			: [],
+	);
+	return { diagnostics, fixes };
 }

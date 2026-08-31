@@ -15,8 +15,6 @@ export interface WorkspaceLinter {
 	readonly availableExtensions: readonly string[];
 }
 
-export type WorkspaceLinterEntry = readonly [string, WorkspaceLinter];
-
 export function configCandidatePattern(root: string): string {
 	return `${root}/.textlintr{c.js,c.yaml,c.yml,c,c.json}`;
 }
@@ -45,7 +43,7 @@ export function uriStartsWith(target: string, prefix: string): boolean {
 }
 
 export function lookupWorkspaceLinter(
-	entries: Iterable<WorkspaceLinterEntry>,
+	entries: Iterable<readonly [string, WorkspaceLinter]>,
 	document: Pick<TextDocument, 'uri'>,
 ): readonly [string, WorkspaceLinter | undefined] {
 	for (const entry of entries) {

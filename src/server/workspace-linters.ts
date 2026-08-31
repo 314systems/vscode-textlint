@@ -7,7 +7,7 @@ import { Files } from 'vscode-languageserver/node';
 import type { WorkspaceFolder } from 'vscode-languageserver/node';
 import { URI } from 'vscode-uri';
 
-import type { ServerInitializationOptions } from '../shared/types.ts';
+import type { ServerSettings } from '../shared/types.ts';
 import {
 	configCandidatePattern,
 	defaultIgnorePath,
@@ -19,16 +19,10 @@ type TextlintModule = Pick<typeof import('textlint'), 'createLinter' | 'loadText
 type LinterMap = Map<string, WorkspaceLinter>;
 
 export interface WorkspaceLinterDependencies {
-	readonly settings: () => ServerInitializationOptions;
+	readonly settings: () => ServerSettings;
 	readonly trace: (message: string, data?: unknown) => void;
 	readonly notifyNoConfig: (workspaceFolder: string) => void;
 	readonly notifyNoLibrary: (workspaceFolder: string) => void;
-}
-
-export interface WorkspaceLinterService {
-	readonly configure: (folders: readonly WorkspaceFolder[] | null) => Promise<void>;
-	readonly remove: (folderUri: string) => void;
-	readonly lookup: (document: TextDocument) => readonly [string, WorkspaceLinter | undefined];
 }
 
 const runtimeRequire = createRequire(import.meta.url);
@@ -150,7 +144,7 @@ function lookupLinter(
 export function createWorkspaceLinterService(
 	dependencies: WorkspaceLinterDependencies,
 	discovery: WorkspaceLinterDiscovery = createDiscovery(dependencies),
-): WorkspaceLinterService {
+) {
 	const linters = new Map<string, WorkspaceLinter>();
 	return {
 		configure: async (folders: readonly WorkspaceFolder[] | null) => {

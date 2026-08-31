@@ -1,6 +1,5 @@
 // Shared builders for colocated server unit tests.
 import type { TextlintMessage } from '@textlint/types';
-import type { Diagnostic } from 'vscode-languageserver';
 
 export function textlintMessage(
 	ruleId: string,
@@ -28,14 +27,9 @@ export function textlintMessage(
 	};
 }
 
-export function diagnostic(message: TextlintMessage): Diagnostic {
-	return {
-		source: 'textlint',
-		code: message.ruleId,
-		message: message.message,
-		range: {
-			start: { line: message.loc.start.line - 1, character: message.loc.start.column - 1 },
-			end: { line: message.loc.end.line - 1, character: message.loc.end.column - 1 },
-		},
-	};
+export function unfixableMessage(
+	ruleId: string,
+	range: readonly [number, number],
+): TextlintMessage {
+	return { ...textlintMessage(ruleId, range), fix: undefined };
 }

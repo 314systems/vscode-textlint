@@ -6,24 +6,17 @@ import {
 	requestedCodeActionKinds,
 	sourceFixAllTextlint,
 } from './code-actions.ts';
-import { hasFixes } from './fixes.ts';
-import type { FixRepositorySlot } from './validation.ts';
+import type { PublishedDiagnostics } from './validation.ts';
 
 export interface CodeActionHandlerDependencies {
 	readonly document: (uri: string) => TextDocument | undefined;
-	readonly repository: (uri: string) => FixRepositorySlot | undefined;
+	readonly published: (uri: string) => PublishedDiagnostics | undefined;
 	readonly validate: (document: TextDocument) => Promise<void>;
 	readonly trace: (message: string, data?: unknown) => void;
 	readonly sendError: (error: unknown) => void;
 }
 
-export interface CodeActionHandler {
-	readonly handle: (params: CodeActionParams) => Promise<CodeAction[]>;
-}
-
-export function createCodeActionHandler(
-	dependencies: CodeActionHandlerDependencies,
-): CodeActionHandler {
+export function createCodeActionHandler(dependencies: CodeActionHandlerDependencies) {
 	return {
 		handle: async (params: CodeActionParams): Promise<CodeAction[]> => {
 			dependencies.trace('onCodeAction', params);
@@ -33,14 +26,11 @@ export function createCodeActionHandler(
 
 			const { uri } = params.textDocument;
 
-			const initialSlot = dependencies.repository(uri);
-			if (!initialSlot) return [];
-
 			const document = dependencies.document(uri);
-			if (!document) return [];
-			const { version } = document;
+			const initial = dependencies.published(uri);
+			if (!document || !initial) return [];
 
-			if (kinds.has(sourceFixAllTextlint) || initialSlot.repository.version !== version) {
+			if (kinds.has(sourceFixAllTextlint) || initial.version !== document.version) {
 				try {
 					await dependencies.validate(document);
 				} catch (error) {
@@ -49,19 +39,13 @@ export function createCodeActionHandler(
 				}
 			}
 
-			const slot = dependencies.repository(uri);
-			if (slot !== initialSlot) return [];
-			const { repository } = slot;
-
-			if (
-				dependencies.document(uri)?.version !== version ||
-				repository.version !== version ||
-				!hasFixes(repository)
-			) {
+			const published = dependencies.published(uri);
+			if (dependencies.document(uri) !== document || published?.version !== document.version) {
 				return [];
 			}
+			if (published.fixes.length === 0) return [];
 
-			return createCodeActions(document, slot.repository, params.context.diagnostics, kinds);
+			return createCodeActions(document, published.fixes, params.range, kinds);
 		},
 	};
 }

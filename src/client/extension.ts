@@ -1,10 +1,5 @@
 import * as vscode from 'vscode';
-import {
-	State,
-	type ErrorHandler,
-	CloseAction,
-	RevealOutputChannelOn,
-} from 'vscode-languageclient';
+import { State, RevealOutputChannelOn } from 'vscode-languageclient';
 import {
 	LanguageClient,
 	type LanguageClientOptions,
@@ -13,19 +8,12 @@ import {
 } from 'vscode-languageclient/node';
 import { Utils as URIUtils } from 'vscode-uri';
 
-import {
-	StatusNotification,
-	NoConfigNotification,
-	NoLibraryNotification,
-	ExitNotification,
-	type ExtensionSettings,
-	defaultServerInitializationOptions,
-} from '../shared/types';
+import { StatusNotification, type TextlintSettings, defaultServerSettings } from '../shared/types';
 import { LanguageStatus } from './status';
 import type { StatusLevel } from './status';
 
-const defaultConfig: ExtensionSettings = {
-	...defaultServerInitializationOptions,
+const defaultConfig: TextlintSettings = {
+	...defaultServerSettings,
 	languages: [],
 };
 
@@ -60,21 +48,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 	client.onNotification(StatusNotification.type, (params) => {
 		status.report(toLevel(params.status), params.message, params.cause);
 	});
-	client.onNotification(NoConfigNotification.type, (params) => {
-		status.report(
-			'warn',
-			`No textlint configuration (e.g .textlintrc) found in ${params.workspaceFolder} .
-File will not be validated. Consider running the 'Create .textlintrc file' command.`,
-		);
-	});
-	client.onNotification(NoLibraryNotification.type, (params) => {
-		status.report(
-			'warn',
-			`Failed to load the textlint library in ${params.workspaceFolder} .
-To use textlint in this workspace please install textlint using 'npm install textlint' or globally using 'npm install -g textlint'.
-You need to reopen the workspace after installing textlint.`,
-		);
-	});
 	context.subscriptions.push(
 		vscode.commands.registerCommand('textlint.createConfig', createConfig),
 		vscode.commands.registerCommand('textlint.showOutputChannel', () => {
@@ -98,8 +71,6 @@ function newClient(context: vscode.ExtensionContext): LanguageClient {
 		run: { module, transport: TransportKind.ipc },
 		debug: { module, transport: TransportKind.ipc, options: debugOptions },
 	};
-	let defaultErrorHandler: ErrorHandler;
-	let serverCalledProcessExit = false;
 	const textlintConfig = readConfig();
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: textlintConfig.languages.map((id) => {
@@ -119,23 +90,8 @@ function newClient(context: vscode.ExtensionContext): LanguageClient {
 			client.error('Server initialization failed.', error);
 			return false;
 		},
-		errorHandler: {
-			error: (error, message, count) => {
-				return defaultErrorHandler.error(error, message, count);
-			},
-			closed: () => {
-				if (serverCalledProcessExit) {
-					return { action: CloseAction.DoNotRestart };
-				}
-				return defaultErrorHandler.closed();
-			},
-		},
 	};
 	const client = new LanguageClient('textlint', serverOptions, clientOptions);
-	defaultErrorHandler = client.createDefaultErrorHandler();
-	client.onNotification(ExitNotification.type, () => {
-		serverCalledProcessExit = true;
-	});
 	return client;
 }
 
@@ -216,7 +172,7 @@ function toQuickPickItems(
 	});
 }
 
-function readConfig(): ExtensionSettings {
+function readConfig(): TextlintSettings {
 	const config = vscode.workspace.getConfiguration('textlint');
 	return {
 		languages: config.get('languages', defaultConfig.languages),
