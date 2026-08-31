@@ -13,15 +13,46 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "npm: tsc",
+			"label": "npm: type-check",
 			"type": "shell",
-			"command": "npm run tsc",
+			"command": "npm run type-check",
 			"group": "build",
 			"presentation": {
 				"panel": "dedicated",
 				"reveal": "never"
 			},
-			"problemMatcher": ["$tsc", "$ts-webpack"]
+			"problemMatcher": ["$tsc"]
+		},
+		{
+			"label": "npm: build",
+			"type": "shell",
+			"command": "npm run build",
+			"group": "build",
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "never"
+			},
+			// swc-loader transpiles without type checking, so this only reports resolution
+			// and syntax errors. Type errors surface through the `npm: type-check` task.
+			"problemMatcher": {
+				"owner": "rspack",
+				"source": "rspack",
+				"fileLocation": ["relative", "${workspaceFolder}"],
+				"pattern": [
+					{
+						"regexp": "^(ERROR|WARNING) in (\\S+)(?: (\\d+):(\\d+)-(\\d+))?$",
+						"severity": 1,
+						"file": 2,
+						"line": 3,
+						"column": 4,
+						"endColumn": 5
+					},
+					{
+						"regexp": "^\\s*[×⚠]\\s*(.*)$",
+						"message": 1
+					}
+				]
+			}
 		},
 		{
 			"label": "npm: watch",
@@ -36,7 +67,32 @@
 				"panel": "dedicated",
 				"reveal": "never"
 			},
-			"problemMatcher": ["$tsc-watch", "$ts-webpack-watch"]
+			"problemMatcher": {
+				"owner": "rspack",
+				"source": "rspack",
+				"fileLocation": ["relative", "${workspaceFolder}"],
+				"pattern": [
+					{
+						"regexp": "^(ERROR|WARNING) in (\\S+)(?: (\\d+):(\\d+)-(\\d+))?$",
+						"severity": 1,
+						"file": 2,
+						"line": 3,
+						"column": 4,
+						"endColumn": 5
+					},
+					{
+						"regexp": "^\\s*[×⚠]\\s*(.*)$",
+						"message": 1
+					}
+				],
+				// rspack prints nothing when a rebuild starts, so the launch readiness signal
+				// relies on `activeOnStart` plus the first "compiled ..." line.
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^.*[Bb]uilding|[Cc]hange detected",
+					"endsPattern": "^.*compiled (?:successfully|with \\d+ (?:error|warning))"
+				}
+			}
 		}
 	]
 }

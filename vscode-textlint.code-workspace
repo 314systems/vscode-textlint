@@ -15,8 +15,8 @@
 	},
 	"extensions": {
 		"recommendations": [
-			"amodio.tsl-problem-matcher",
 			"editorconfig.editorconfig",
+			"ms-vscode.extension-test-runner",
 			"oxc.oxc-vscode",
 		],
 	},

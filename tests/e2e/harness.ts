@@ -1,19 +1,22 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { test } from 'node:test';
-import type { TestContext } from 'node:test';
 
 import * as vscode from 'vscode';
 
-const testPromises: Promise<void>[] = [];
-const TEST_TIMEOUT = 90_000;
 const DIAGNOSTICS_TIMEOUT = 10_000;
 
-export function checkedTest(
-	name: string,
-	function_: (context: TestContext) => Promise<void> | void,
-): void {
-	testPromises.push(test(name, { timeout: TEST_TIMEOUT }, function_));
+const pendingCleanups: (() => Promise<void>)[] = [];
+
+// Registered on the root suite when this module is first imported, so that a single hook
+// drains whatever the running test queued up. Mocha does not let a test add its own hooks.
+teardown(async () => {
+	for (const cleanup of pendingCleanups.splice(0)) {
+		await cleanup();
+	}
+});
+
+export function registerCleanup(cleanup: () => Promise<void>): void {
+	pendingCleanups.push(cleanup);
 }
 
 export async function waitForEditorStabilization(timeMilliseconds = 1_000): Promise<void> {
@@ -83,7 +86,6 @@ export function waitForDiagnostics(
 }
 
 export async function setupServerFixture(
-	context: TestContext,
 	testFileName = 'testtest2.txt',
 ): Promise<{ testFile: string }> {
 	await setupExtension();
@@ -91,14 +93,10 @@ export async function setupServerFixture(
 	const sourceFile = path.join(rootPath, 'testtest.txt');
 	const testFile = path.join(rootPath, testFileName);
 
-	context.after(async () => {
+	registerCleanup(async () => {
 		await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 		await fs.rm(testFile, { force: true });
 	});
 	await fs.cp(sourceFile, testFile);
 	return { testFile };
-}
-
-export async function testsDone(): Promise<void> {
-	await Promise.all(testPromises);
 }

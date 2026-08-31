@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as vscode from 'vscode';
 
 import {
-	checkedTest,
+	registerCleanup,
 	setupServerFixture,
 	waitForCondition,
 	waitForDiagnostics,
@@ -53,54 +53,64 @@ async function verifyQuickFixes(fileUri: vscode.Uri, query: CodeActionQuery): Pr
 	assert.strictEqual(single.command, undefined);
 }
 
-checkedTest('Extension tests > Server integration > Autofix', async (context) => {
-	const { testFile } = await setupServerFixture(context, 'testtest-autofix.txt');
-	const fileUri = vscode.Uri.file(testFile);
-	const linted = waitForDiagnostics(fileUri);
-	const document = await vscode.workspace.openTextDocument(testFile);
-	await vscode.window.showTextDocument(document);
-	const edit = new vscode.WorkspaceEdit();
-	edit.insert(fileUri, document.positionAt(document.getText().length), ' ');
-	await vscode.workspace.applyEdit(edit);
-	await linted;
-	const documentRange = new vscode.Range(
-		document.positionAt(0),
-		document.positionAt(document.getText().length),
-	);
-	const query: CodeActionQuery = (kind) =>
-		vscode.commands.executeCommand(
-			'vscode.executeCodeActionProvider',
-			fileUri,
-			documentRange,
-			kind,
-		);
-	const sourceFixAll = await verifySourceFixAll(query, fileUri);
-	await verifyQuickFixes(fileUri, query);
-	assert.ok(await vscode.workspace.applyEdit(sourceFixAll.edit!));
-	assert.ok(!document.getText().includes('yuo'));
-});
+suite('Extension tests', () => {
+	suite('Server integration', () => {
+		test('Autofix', async () => {
+			const { testFile } = await setupServerFixture('testtest-autofix.txt');
+			const fileUri = vscode.Uri.file(testFile);
+			const linted = waitForDiagnostics(fileUri);
+			const document = await vscode.workspace.openTextDocument(testFile);
+			await vscode.window.showTextDocument(document);
+			const edit = new vscode.WorkspaceEdit();
+			edit.insert(fileUri, document.positionAt(document.getText().length), ' ');
+			await vscode.workspace.applyEdit(edit);
+			await linted;
+			const documentRange = new vscode.Range(
+				document.positionAt(0),
+				document.positionAt(document.getText().length),
+			);
+			const query: CodeActionQuery = (kind) =>
+				vscode.commands.executeCommand(
+					'vscode.executeCodeActionProvider',
+					fileUri,
+					documentRange,
+					kind,
+				);
+			const sourceFixAll = await verifySourceFixAll(query, fileUri);
+			await verifyQuickFixes(fileUri, query);
+			assert.ok(await vscode.workspace.applyEdit(sourceFixAll.edit!));
+			assert.ok(!document.getText().includes('yuo'));
+		});
 
-checkedTest('Extension tests > Server integration > Code Actions on Save', async (context) => {
-	const { testFile } = await setupServerFixture(context, 'testtest-fix-on-save.txt');
-	const fileUri = vscode.Uri.file(testFile);
-	const linted = waitForDiagnostics(fileUri);
-	const configuration = vscode.workspace.getConfiguration('editor');
-	const original =
-		configuration.inspect<Record<string, string | boolean>>('codeActionsOnSave')?.workspaceValue;
-	context.after(async () => {
-		await configuration.update('codeActionsOnSave', original, vscode.ConfigurationTarget.Workspace);
+		test('Code Actions on Save', async () => {
+			const { testFile } = await setupServerFixture('testtest-fix-on-save.txt');
+			const fileUri = vscode.Uri.file(testFile);
+			const linted = waitForDiagnostics(fileUri);
+			const configuration = vscode.workspace.getConfiguration('editor');
+			const original =
+				configuration.inspect<Record<string, string | boolean>>(
+					'codeActionsOnSave',
+				)?.workspaceValue;
+			registerCleanup(async () => {
+				await configuration.update(
+					'codeActionsOnSave',
+					original,
+					vscode.ConfigurationTarget.Workspace,
+				);
+			});
+			await configuration.update(
+				'codeActionsOnSave',
+				{ ...original, 'source.fixAll.textlint': 'explicit' },
+				vscode.ConfigurationTarget.Workspace,
+			);
+			const document = await vscode.workspace.openTextDocument(testFile);
+			await vscode.window.showTextDocument(document);
+			await linted;
+			const edit = new vscode.WorkspaceEdit();
+			edit.insert(fileUri, document.positionAt(document.getText().length), ' ');
+			await vscode.workspace.applyEdit(edit);
+			await document.save();
+			assert.ok(await waitForCondition(() => !document.getText().includes('yuo')));
+		});
 	});
-	await configuration.update(
-		'codeActionsOnSave',
-		{ ...original, 'source.fixAll.textlint': 'explicit' },
-		vscode.ConfigurationTarget.Workspace,
-	);
-	const document = await vscode.workspace.openTextDocument(testFile);
-	await vscode.window.showTextDocument(document);
-	await linted;
-	const edit = new vscode.WorkspaceEdit();
-	edit.insert(fileUri, document.positionAt(document.getText().length), ' ');
-	await vscode.workspace.applyEdit(edit);
-	await document.save();
-	assert.ok(await waitForCondition(() => !document.getText().includes('yuo')));
 });
